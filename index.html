@@ -1959,7 +1959,7 @@ async function admin(err = '') {
     <button class="cta adm-extra" id="viewfull"><span><b>숨긴 기능까지 써 보기</b><small>랜덤 퀴즈, 10분 복습, 문법 문제, 카드 등 학생에게 가려 둔 기능 전부</small></span><span class="arrow">→</span></button>
     <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>반 관리 (${groups.length})</summary>
       <div class="stack" style="gap:8px;margin-top:10px">
-        ${groups.map(g => `<div class="adm-grow"><span>${esc(g)} <span class="muted">${rows.filter(r => r.group === g && r.active).length}명</span></span><button class="ghost" data-delgrp="${esc(g)}">삭제</button></div>`).join('') || '<p class="muted" style="font-size:.85rem">아직 반이 없어요.</p>'}
+        ${groups.map(g => `<div class="adm-grow"><span>${esc(g)} <span class="muted">${rows.filter(r => r.group === g && r.active).length}명</span></span><span class="row" style="gap:4px;flex:none"><button class="ghost" data-rengrp="${esc(g)}">이름 수정</button><button class="ghost" data-delgrp="${esc(g)}">삭제</button></span></div>`).join('') || '<p class="muted" style="font-size:.85rem">아직 반이 없어요.</p>'}
         <form id="addgrp" class="adm-grow"><input class="answer-in" id="gname" placeholder="새 반 이름 (예: 화목 7pm)" style="min-width:0"><button class="btn" style="width:auto;flex:none;white-space:nowrap;padding:0 18px">추가</button></form>
       </div>
     </details>
@@ -2016,6 +2016,22 @@ async function admin(err = '') {
     if (groups.includes(g)) return toast('이미 있는 반이에요.');
     await api.saveGroups(adminTok, [...groups, g]); GROUPS = [...groups, g]; admin();
   };
+  app.querySelectorAll('[data-rengrp]').forEach(b => b.onclick = () => {
+    const g = b.dataset.rengrp, row = b.closest('.adm-grow');
+    row.innerHTML = `<input class="answer-in" value="${esc(g)}" style="min-width:0;flex:1"><span class="row" style="gap:4px;flex:none"><button class="btn" style="width:auto;padding:0 14px;white-space:nowrap">저장</button><button class="ghost">취소</button></span>`;
+    const inp = row.querySelector('input'), [ok, no] = row.querySelectorAll('button');
+    inp.focus(); inp.select();
+    no.onclick = () => admin();
+    const save = async () => {
+      const n = inp.value.trim(); if (!n || n === g) return admin();
+      if (groups.includes(n)) return toast('이미 있는 반이에요.');
+      ok.disabled = true;
+      for (const r of rows.filter(r => r.group === g)) await api.adminSave(adminTok, r.id, r.name, n, r.memos || []);
+      const list = groups.map(x => x === g ? n : x);
+      await api.saveGroups(adminTok, list); GROUPS = list; toast('반 이름을 바꿨어요.'); admin();
+    };
+    ok.onclick = save; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') admin(); };
+  });
   app.querySelectorAll('[data-delgrp]').forEach(b => b.onclick = async () => {
     const g = b.dataset.delgrp, inG = rows.filter(r => r.group === g);
     if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = inG.length ? `삭제 (${inG.length}명은 개인으로)` : '정말 삭제'; return; }
