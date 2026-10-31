@@ -1,3 +1,4 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>뉴욕프리토킹 복습노트</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -307,7 +308,14 @@ button:active:not(:disabled) { transform: scale(.97) }
 .chip.pick { cursor: pointer; border: 1px solid transparent; } .chip.pick.on { background: var(--accent); color: #fff; }
 .pill.timer { font-variant-numeric: tabular-nums; background: var(--accent); color: #fff; }
 .mode.ten { background: linear-gradient(135deg, var(--accent), #6a5cff); color: #fff; } .mode.ten h3 { color: #fff; } .mode.ten span:not(.ico) { color: rgba(255,255,255,.85); }
-/* lite mode (only 수업별 복습) */
+/* lite mode (only 수업 복습) */
+.modeswitch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--fill); border-radius: 16px; padding: 4px }
+.modeswitch button { border: 0; background: none; border-radius: 12px; padding: 12px 8px; font-weight: 700; font-size: 1rem; color: var(--muted); cursor: pointer }
+.modeswitch button[aria-selected="true"] { background: var(--accent); color: #fff }
+.memo-frame { background: var(--surface); border-radius: 20px; overflow: hidden; min-height: 300px }
+.memo-frame iframe { display: block; width: 100%; height: calc(100dvh - 230px); min-height: 520px; border: 0; background: #fff }
+@media (max-width: 959px) { .memo-frame { margin-inline: -16px; border-radius: 0 } }
+@media (min-width: 960px) { .memo-frame iframe { height: calc(100vh - 260px) } }
 body.lite #tabbar { display: none !important }
 body.lite.authed .wrap { padding-bottom: 48px }
 body.lite .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)) }
@@ -667,7 +675,7 @@ function home() {
     app.innerHTML = `${bar()}
     <div class="stack" style="gap:20px">
       <div class="stack" style="gap:4px"><span class="label">${hello}</span><h1>${esc(me.name)}의 수업 복습</h1>
-        <p class="muted" style="margin:0">수업 ${lessons.length}회 · 날짜를 눌러 그날 배운 표현과 문장을 다시 보고 연습해요</p></div>
+        <p class="muted" style="margin:0">수업 ${lessons.length}회 · 날짜를 누르면 그날 수업 메모가 열려요. '반복 말하기'로 표현과 문장을 연습해요</p></div>
       <div class="months">${lessonGroups(months)}</div>
     </div>`;
     return;
@@ -747,14 +755,32 @@ function exprHTML(x) {
     ${x.examples.map(t => `<div class="ex">${sayBtn(t)}<span>${esc(t)}</span></div>`).join('')}
   </div>`;
 }
+const MEMO_URLS = {};
+// Small-screen fixes for the memo decks' own toolbar (they were made for wide screens).
+const MEMO_FIX = `<style id="nyft-fix">@media (max-width: 639px) { body { padding: 8px !important }
+  header > div { flex-wrap: wrap; justify-content: center; gap: 6px } header > div > * { margin-left: 0 !important }
+  header button { padding: 8px 12px !important; font-size: 13px !important; white-space: nowrap } header select { max-width: 100%; flex: 1 1 100% }
+  header [onclick="window.print()"] { display: none !important } }</style>`;
+async function memoUrl(m) {
+  if (MEMO_URLS[m.id]) return MEMO_URLS[m.id];
+  let h = null;
+  try { h = m.href ? await (await fetch(m.href)).text() : await api.getMemoHtml(me.token || adminTok, m.id); } catch { if (m.href) return m.href; throw new Error('no memo'); }
+  if (!h) throw new Error('no memo');
+  h = h.includes('</head>') ? h.replace('</head>', MEMO_FIX + '</head>') : MEMO_FIX + h;
+  return MEMO_URLS[m.id] = URL.createObjectURL(new Blob([h], { type: 'text/html' }));
+}
 function lesson(id, tab) {
   const m = DATA.memos[id];
-  tab = tab || ((m.sentences || []).length ? 'speak' : 'expr');
+  const hasMemo = !!(m.href || m.hasHtml);
+  // Ryan 2026-10-31: 수업 복습 = the original memo HTML; the practice tabs below are now called 반복 말하기.
+  const practiceTab = (m.sentences || []).length ? 'speak' : 'expr';
+  tab = tab || (hasMemo ? 'memo' : practiceTab);
   const tabs = [...((m.sentences || []).length ? [['speak', '말하기 연습'], ['sent', `문장 ${m.sentences.length}`]] : []), ['expr', `표현 ${m.expressions.length}`], ['fill', `빈칸 ${m.fill.length}`], ['prod', `영작 ${m.production.length}`]];
   let body = '';
   if (tab === 'speak') { const s = speakStatus(m); body = `<div class="expr stack" style="gap:10px"><p style="margin:0">수업 때 내가 한 이야기를 단계별로 다시 말해 봐요. 처음엔 전체를 보고 읽고, 그다음엔 한 문장씩, 점점 더 많은 문장을 가리다가 마지막엔 전부 가린 채 혼자 말해요.</p>
     <p class="muted" style="margin:0">${s.parts.length}부분 · 문장 ${s.parts.reduce((a, p) => a + p.units.length, 0)}개 · ${s.text}</p><div class="meter" style="width:100%"><i style="width:${s.pct}%"></i></div>
     <button class="btn" id="speakgo">${s.pct && s.pct < 100 ? '이어서 말하기' : s.pct === 100 ? '처음부터 다시' : '말하기 시작'}</button></div>`; }
+  if (tab === 'memo') body = `<div class="memo-frame"><p class="muted" id="memoload" style="padding:24px">수업 메모를 불러오는 중…</p></div>`;
   if (tab === 'expr') body = m.expressions.map(exprHTML).join('');
   if (tab === 'fill') body = `<button class="btn" id="go">이 수업 빈칸 문제 풀기</button>` + m.fill.map(q => `<div class="expr"><p>${esc(q.before)} <mark>${esc(q.answers[0])}</mark>${/^[.,?!]/.test(q.after) ? '' : ' '}${esc(q.after)}</p><p class="note">${esc(q.ko)}</p></div>`).join('');
   if (tab === 'sent') body = m.sentences.map(x => `<div class="expr"><div class="ex" style="border:0;padding:0">${sayBtn(x.en)}<span>${markHl(x.en, x.hl)}</span></div>${x.ko ? `<p class="note">${esc(x.ko)}</p>` : ''}</div>`).join('');
@@ -764,20 +790,23 @@ function lesson(id, tab) {
     <div class="stack" style="gap:6px">
       <span class="label">${m.date.replace(/-/g, '.')} 수업</span>
       <h1 style="font-size:1.6rem">${esc(m.topic)}</h1>
-      ${m.href ? `<a class="memo-link" href="${esc(m.href)}" target="_blank" rel="noopener">수업 메모 전체 보기 →</a>` : m.hasHtml ? `<a class="memo-link" href="#" id="memohtml">수업 메모 전체 보기 →</a>` : ''}
+      ${tab === 'memo' ? `<a class="memo-link" href="#" id="memohtml">새 창에서 크게 보기 →</a>` : ''}
     </div>
-    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}</button>`).join('')}</div>
-    <div class="stack ${tab === 'speak' || tab === 'prod' ? '' : 'cols'}" style="gap:10px">${body}</div>
+    ${hasMemo ? `<div class="modeswitch" role="tablist"><button role="tab" aria-selected="${tab === 'memo'}" data-tab="memo">📄 수업 복습</button><button role="tab" aria-selected="${tab !== 'memo'}" data-tab="${practiceTab}">🗣️ 반복 말하기</button></div>` : ''}
+    ${tab === 'memo' ? '' : `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}</button>`).join('')}</div>`}
+    <div class="stack ${tab === 'speak' || tab === 'prod' || tab === 'memo' ? '' : 'cols'}" style="gap:10px">${body}</div>
   </div>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => lesson(id, b.dataset.tab));
   if (tab === 'prod') bindReveal();
   const mh = document.getElementById('memohtml');
   if (mh) mh.onclick = async e => {
-    e.preventDefault(); const w = window.open('', '_blank'); mh.textContent = '불러오는 중…';
-    try { const h = await api.getMemoHtml(me.token || adminTok, id); const url = URL.createObjectURL(new Blob([h || ''], { type: 'text/html' })); if (w) w.location = url; else location.href = url; }
-    catch { if (w) w.close(); }
-    mh.textContent = '수업 메모 전체 보기 →';
+    e.preventDefault(); const w = window.open('', '_blank');
+    try { const url = await memoUrl(m); if (w) w.location = url; else location.href = url; } catch { if (w) w.close(); }
   };
+  if (tab === 'memo') memoUrl(m).then(url => {
+    const box = app.querySelector('.memo-frame'); if (!box) return;
+    box.innerHTML = `<iframe title="${esc(m.topic)} 수업 메모" src="${url}"></iframe>`;
+  }).catch(() => { const l = document.getElementById('memoload'); if (l) l.textContent = '수업 메모를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; });
   const selTab = app.querySelector('.tab[aria-selected="true"]'); if (selTab) selTab.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   const sg = document.getElementById('speakgo'); if (sg) sg.onclick = () => state[speakKey(id)]?.done ? speak(id, 0, 0) : speak(id);
   const go = document.getElementById('go');
@@ -1617,7 +1646,7 @@ function layout(name) {
     tb.innerHTML = '';
     const ms = lessonsOf(me);
     side.innerHTML = `<div class="brand">Ryan's class review</div><div class="side-who">${esc(me.name)}${me.group ? ` · ${esc(me.group)}` : ''}${me.viewOnly ? ' · 선생님 보기' : ''}</div>
-      <button class="nav" data-go="home" ${name === 'home' ? 'aria-current="page"' : ''}><span class="i">🗂️</span>수업별 복습</button>
+      <button class="nav" data-go="home" ${name === 'home' ? 'aria-current="page"' : ''}><span class="i">🗂️</span>수업 복습</button>
       <div class="side-list">${ms.map(m => `<button class="nav sub" data-go="lesson:${m.id}" ${curLesson === m.id && name !== 'home' ? 'aria-current="page"' : ''}><span class="d">${fmtDate(m.date)}</span><span class="tt">${esc(m.topic)}</span></button>`).join('')}</div>
       <div class="side-foot">${me.viewOnly ? '<a class="ghost" href="#admin" style="text-decoration:none">관리 화면</a>' : '<button class="ghost" data-go="pin">비밀번호</button><button class="ghost" data-go="logout">나가기</button>'}</div>`;
     return;
