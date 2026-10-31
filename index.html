@@ -438,6 +438,26 @@ body.lite .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)) }
   .welcome #loginform .answer-in { background: var(--fill) }
   .welcome > a { grid-column: 2; justify-self: center !important }
 }
+
+/* admin: one column on phones, side panel + card grid on PC */
+.adm-cols { display: grid; gap: 18px }
+.adm-search { display: grid; gap: 8px }
+.adm-toggle { font-size: .85rem; display: flex; gap: 6px; align-items: center }
+.adm-list { display: grid; gap: 12px }
+.adm-card[hidden] { display: none }
+.adm-memos { max-height: 280px; overflow-y: auto }
+.adm-acts .ghost { font-size: .85rem }
+.adm-extra { background: linear-gradient(135deg, #7c5cff, #4f7bff) }
+.adm-add summary { cursor: pointer; font-weight: 700; list-style: none } .adm-add summary::-webkit-details-marker { display: none } .adm-add summary::after { content: ' +'; color: var(--muted) } .adm-add[open] summary::after { content: '' }
+@media (max-width: 959px) { .adm-acts { display: grid; grid-template-columns: 1fr; gap: 6px } }
+@media (min-width: 960px) {
+  .adm { max-width: 1240px; margin: 0 auto }
+  body:not(.authed) .wrap:has(.adm) { max-width: 1280px }
+  .adm-cols { grid-template-columns: 320px minmax(0, 1fr); align-items: start; gap: 28px }
+  .adm-side { position: sticky; top: 24px }
+  .adm-search { grid-template-columns: 1fr auto; align-items: center }
+  .adm-list { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start }
+}
 </style>
 
 <nav id="side" aria-label="메뉴"></nav>
@@ -449,8 +469,9 @@ body.lite .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)) }
 const DATA = JSON.parse(document.getElementById('data').textContent);
 const app = document.getElementById('app');
 const DAY = 864e5;
-// Ryan 2026-10-31: show only 수업별 복습 for now. The other features stay in the code; set true to show them again.
-const EXTRAS = false;
+// Ryan 2026-10-31: students see only 수업별 복습. The other features stay in the code; the teacher can open them
+// from the admin screen ("숨긴 기능까지 써 보기"), which switches this on for that teacher view only.
+let EXTRAS = false;
 const INTERVALS = [0, 1, 2, 4, 8, 16, 32]; // days per box
 let me = null, state = {};
 
@@ -1842,6 +1863,8 @@ function finish(title, line, back) {
 // ---------- teacher admin (#admin) ----------
 let adminTok = null;
 async function admin(err = '') {
+  EXTRAS = false; me = null;
+  document.body.classList.remove('authed', 'focus', 'lite');
   adminTok = adminTok || store.get('nyft:admin', null);
   let rows = null;
   if (adminTok) { try { rows = await api.adminList(adminTok); } catch {} }
@@ -1868,36 +1891,59 @@ async function admin(err = '') {
     const last = r.updated_at ? new Date(r.updated_at) : null;
     return `카드 익힘 ${learned} · 푼 문제 ${ids.filter(k => 'fp'.includes(k[0])).length}${last ? ` · 마지막 ${last.getMonth() + 1}/${last.getDate()}` : ' · 아직 안 들어옴'}`;
   };
-  app.innerHTML = `<div class="bar"><span class="who">선생님 관리 화면</span><a class="ghost" href="#" style="text-decoration:none">학생 화면</a><button class="ghost" id="aout">나가기</button></div>
-  <div class="stack" style="gap:18px">
-    ${CFG.url ? '' : '<p class="feedback no">미리보기 모드예요. 여기서 바꾼 내용은 이 브라우저에만 저장돼요. (관리자 비밀번호: 5813)</p>'}
-    <form id="add" class="expr" style="gap:10px">
-      <h3>학생 추가</h3>
-      <div class="row"><input class="answer-in" id="nn" placeholder="이름 (예: 민지님)" style="flex:2;min-width:0"><input class="answer-in" id="ng" placeholder="그룹 (선택)" style="flex:1;min-width:0"></div>
+  const active = rows.filter(r => r.active).length;
+  app.innerHTML = `<div class="adm">
+  <div class="bar adm-bar"><span class="who">선생님 관리 화면</span><a class="ghost" href="#" style="text-decoration:none">학생 화면</a><button class="ghost" id="aout">나가기</button></div>
+  ${CFG.url ? '' : '<p class="feedback no">미리보기 모드예요. 여기서 바꾼 내용은 이 브라우저에만 저장돼요. (관리자 비밀번호: 5813)</p>'}
+  <div class="adm-cols">
+  <aside class="adm-side stack" style="gap:14px">
+    <button class="cta" id="viewall"><span><b>모든 수업 보기</b><small>메모 ${Object.keys(DATA.memos).length}개를 학생 화면 그대로 둘러봐요</small></span><span class="arrow">→</span></button>
+    <button class="cta adm-extra" id="viewfull"><span><b>숨긴 기능까지 써 보기</b><small>랜덤 퀴즈, 10분 복습, 문법 문제, 카드 등 학생에게 가려 둔 기능 전부</small></span><span class="arrow">→</span></button>
+    <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>학생 추가</summary>
+    <form id="add" class="stack" style="gap:10px;margin-top:10px">
+      <input class="answer-in" id="nn" placeholder="이름 (예: 민지님)">
+      <input class="answer-in" id="ng" placeholder="그룹 (선택)">
       <p class="muted" style="font-size:.85rem">처음 비밀번호는 ${DEFAULT_PIN}이고, 첫 로그인 때 학생이 직접 바꿔요.</p>
-      <button class="btn" style="justify-self:start">추가하기</button>
-    </form>
-    <button class="cta" id="viewall"><span><b>모든 수업 보기</b><small>메모 ${Object.keys(DATA.memos).length}개 전체를 학생 화면처럼 둘러봐요</small></span><span class="arrow">→</span></button>
+      <button class="btn">추가하기</button>
+    </form></details>
+  </aside>
+  <section class="adm-main stack" style="gap:12px">
+    <div class="adm-search"><input class="answer-in" id="q" type="search" placeholder="학생 이름이나 그룹으로 검색" autocomplete="off">
+      <label class="muted adm-toggle"><input type="checkbox" id="showout"> 내보낸 학생도 보기</label></div>
     <p class="err" id="err">${esc(err || '')}</p>
-    <span class="label">학생 ${rows.filter(r => r.active).length}명</span>
-    ${rows.map(r => `<div class="expr" style="${r.active ? '' : 'opacity:.55'}">
+    <span class="label" id="cnt">학생 ${active}명</span>
+    <div class="adm-list">
+    ${rows.map(r => `<div class="expr adm-card" data-q="${esc((r.name + ' ' + (r.group || '개인')).toLowerCase())}" data-out="${r.active ? '' : '1'}" style="${r.active ? '' : 'opacity:.55'}">
       <div class="head"><span class="en">${esc(r.name)} <span class="muted" style="font-weight:400;font-size:.85rem">${esc(r.group || '개인')}${r.active ? '' : ' · 내보냄'}${r.must_change ? ' · 비밀번호 미변경' : ''}</span></span></div>
       <p class="note">${summary(r)}</p>
       <details><summary class="muted" style="cursor:pointer;font-size:.9rem">볼 수 있는 수업 (${memosFor(r).length})</summary>
-        <div class="stack" style="gap:4px;margin-top:8px">${memoList.map(m => {
+        <div class="stack adm-memos" style="gap:4px;margin-top:8px">${memoList.map(m => {
           const fixed = (DATA.assign[r.id] || []).includes(m.id);
           return `<label style="font-size:.9rem;display:flex;gap:8px"><input type="checkbox" data-memo="${esc(r.id)}" value="${esc(m.id)}" ${fixed || (r.memos || []).includes(m.id) ? 'checked' : ''} ${fixed ? 'disabled' : ''}> ${fmtDate(m.date)} ${esc(m.topic)}</label>`;
         }).join('')}</div></details>
-      <div class="row">
+      <div class="row adm-acts">
         <button class="ghost" data-view="${esc(r.id)}">학생 화면 보기</button>
         <button class="ghost" data-act="reset" data-id="${esc(r.id)}">비밀번호 ${DEFAULT_PIN}으로 초기화</button>
         <button class="ghost" data-act="${r.active ? 'off' : 'on'}" data-id="${esc(r.id)}">${r.active ? '내보내기' : '다시 들이기'}</button>
       </div></div>`).join('')}
-  </div>`;
+    </div>
+    <p class="muted" id="none" hidden>찾는 학생이 없어요.</p>
+  </section></div></div>`;
+  const q = document.getElementById('q'), showout = document.getElementById('showout');
+  const filter = () => {
+    const t = q.value.trim().toLowerCase(); let n = 0;
+    app.querySelectorAll('.adm-card').forEach(c => { const ok = (!t || c.dataset.q.includes(t)) && (showout.checked || !c.dataset.out); c.hidden = !ok; n += ok; });
+    document.getElementById('cnt').textContent = t ? `검색 결과 ${n}명` : `학생 ${n}명`;
+    document.getElementById('none').hidden = n > 0;
+    try { sessionStorage.setItem('adm-q', q.value); } catch {}
+  };
+  try { q.value = sessionStorage.getItem('adm-q') || ''; } catch {}
+  q.oninput = filter; showout.onchange = filter; filter();
   const byId = Object.fromEntries(rows.map(r => [r.id, r]));
   // Teacher view: browse as a student (or all memos) without saving anything to their progress.
-  const viewAs = (who, memos, st) => { me = { ...who, memos, viewOnly: true, token: null }; state = JSON.parse(JSON.stringify(st || {})); location.hash = 'view'; home(); };
+  const viewAs = (who, memos, st, full = false) => { EXTRAS = full; me = { ...who, memos, viewOnly: true, token: null }; state = JSON.parse(JSON.stringify(st || {})); location.hash = 'view'; scrollTo(0, 0); home(); };
   document.getElementById('viewall').onclick = () => viewAs({ id: 'teacher', name: '전체 수업', group: '' }, Object.keys(DATA.memos), {});
+  document.getElementById('viewfull').onclick = () => viewAs({ id: 'teacher', name: '전체 기능 체험', group: '' }, Object.keys(DATA.memos), {}, true);
   app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { const r = byId[b.dataset.view]; viewAs({ id: r.id, name: r.name, group: r.group }, memosFor(r), r.state); });
   document.getElementById('aout').onclick = () => { adminTok = null; store.set('nyft:admin', null); location.hash = ''; };
   document.getElementById('add').onsubmit = async e => {
