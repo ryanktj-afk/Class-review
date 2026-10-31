@@ -1845,7 +1845,7 @@ async function admin(err = '') {
   adminTok = adminTok || store.get('nyft:admin', null);
   let rows = null;
   if (adminTok) { try { rows = await api.adminList(adminTok); } catch {} }
-  if (!adminTok || !rows) {
+  if (!adminTok || !rows || !rows.length) {  // expired token: server answers an empty list
     adminTok = null; store.set('nyft:admin', null);
     app.innerHTML = `<form id="al" class="stack" style="gap:14px;max-width:420px;padding-top:28px">
       <span class="label">선생님 관리 화면</span><h1 style="font-size:1.6rem">관리자 비밀번호</h1>
