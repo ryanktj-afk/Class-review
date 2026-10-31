@@ -439,6 +439,14 @@ body.lite .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)) }
   .welcome > a { grid-column: 2; justify-self: center !important }
 }
 
+.adm-cat { font-size: 1.15rem; margin: 10px 0 0 }
+.adm-sec { display: grid; gap: 10px } .adm-sec[hidden] { display: none }
+.adm-sec-h { display: flex; gap: 8px; align-items: baseline }
+.adm-grp { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: .85rem; margin-left: auto; max-width: 150px }
+.adm-card .head { display: flex; gap: 8px; align-items: center }
+.adm-grow { display: flex; gap: 8px; align-items: center; justify-content: space-between }
+.adm-grow .ghost { font-size: .85rem }
+select.answer-in { appearance: auto }
 /* admin: one column on phones, side panel + card grid on PC */
 .adm-cols { display: grid; gap: 18px }
 .adm-search { display: grid; gap: 8px }
@@ -472,6 +480,7 @@ const DAY = 864e5;
 // Ryan 2026-10-31: students see only 수업별 복습. The other features stay in the code; the teacher can open them
 // from the admin screen ("숨긴 기능까지 써 보기"), which switches this on for that teacher view only.
 let EXTRAS = false;
+let GROUPS = null; // admin: class (반) names, including empty ones
 const INTERVALS = [0, 1, 2, 4, 8, 16, 32]; // days per box
 let me = null, state = {};
 
@@ -597,6 +606,8 @@ const api = CFG.url ? {
   getMemos: tok => rpc('get_memos', { tok }),
   getShared: tok => rpc('get_shared', { tok }),
   getMemoHtml: (tok, mid) => rpc('get_memo_html', { tok, mid }),
+  // Class (반) list lives in the memo table under '_groups' so empty classes survive; students never receive it.
+  saveGroups: (tok, list) => rpc('admin_put_memo', { tok, mid: '_groups', d: { groups: list }, h: null }),
 } : {
   async loginName(name, pin) { const d = local.db(); const hit = Object.entries(d.students).find(([, x]) => x.active && nameKey(x.name) === nameKey(name)); if (!hit || hit[1].pin !== pin) return null; return { token: 'local:' + hit[0], ...local.row(hit[0], hit[1]) }; },
   async me(tok) { const id = tok.slice(6), x = local.db().students[id]; return x && x.active ? local.row(id, x) : null; },
@@ -607,6 +618,7 @@ const api = CFG.url ? {
   async adminList() { const d = local.db(); return Object.entries(d.students).map(([id, x]) => ({ id, name: x.name, group: x.grp, memos: x.memos, active: x.active, must_change: x.must_change, state: d.progress[id] || {}, updated_at: d.updated[id] || null })); },
   async adminSave(t, id, name, grp, memos) { const d = local.db(); d.students[id] = { ...(d.students[id] || { pin: DEFAULT_PIN, active: true, must_change: true }), name, grp, memos }; local.save(d); return true; },
   async adminActive(t, id, on) { const d = local.db(); d.students[id].active = on; local.save(d); return true; },
+  async saveGroups(t, list) { store.set('nyft:groups', list); GROUPS = list; return true; },
   async adminReset(t, id) { const d = local.db(); Object.assign(d.students[id], { pin: DEFAULT_PIN, must_change: true }); local.save(d); return true; },
 };
 // Memos a student sees: the ones the site build assigned plus any Ryan picked on the admin screen.
@@ -688,6 +700,7 @@ async function loadMemos(tok) {
   if (!CFG.url) return;
   const [ms, sh] = await Promise.all([api.getMemos(tok), api.getShared(tok)]);
   DATA.memos = ms || {}; SHARED = sh || []; EXPR_CACHE = null;
+  if (DATA.memos._groups) { GROUPS = DATA.memos._groups.groups || []; delete DATA.memos._groups; }
 }
 async function enter(s) {
   try { await loadMemos(s.token); } catch { app.innerHTML = '<p class="err" style="padding:24px">수업 자료를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</p>'; return; }
@@ -1892,29 +1905,12 @@ async function admin(err = '') {
     return `카드 익힘 ${learned} · 푼 문제 ${ids.filter(k => 'fp'.includes(k[0])).length}${last ? ` · 마지막 ${last.getMonth() + 1}/${last.getDate()}` : ' · 아직 안 들어옴'}`;
   };
   const active = rows.filter(r => r.active).length;
-  app.innerHTML = `<div class="adm">
-  <div class="bar adm-bar"><span class="who">선생님 관리 화면</span><a class="ghost" href="#" style="text-decoration:none">학생 화면</a><button class="ghost" id="aout">나가기</button></div>
-  ${CFG.url ? '' : '<p class="feedback no">미리보기 모드예요. 여기서 바꾼 내용은 이 브라우저에만 저장돼요. (관리자 비밀번호: 5813)</p>'}
-  <div class="adm-cols">
-  <aside class="adm-side stack" style="gap:14px">
-    <button class="cta" id="viewall"><span><b>모든 수업 보기</b><small>메모 ${Object.keys(DATA.memos).length}개를 학생 화면 그대로 둘러봐요</small></span><span class="arrow">→</span></button>
-    <button class="cta adm-extra" id="viewfull"><span><b>숨긴 기능까지 써 보기</b><small>랜덤 퀴즈, 10분 복습, 문법 문제, 카드 등 학생에게 가려 둔 기능 전부</small></span><span class="arrow">→</span></button>
-    <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>학생 추가</summary>
-    <form id="add" class="stack" style="gap:10px;margin-top:10px">
-      <input class="answer-in" id="nn" placeholder="이름 (예: 민지님)">
-      <input class="answer-in" id="ng" placeholder="그룹 (선택)">
-      <p class="muted" style="font-size:.85rem">처음 비밀번호는 ${DEFAULT_PIN}이고, 첫 로그인 때 학생이 직접 바꿔요.</p>
-      <button class="btn">추가하기</button>
-    </form></details>
-  </aside>
-  <section class="adm-main stack" style="gap:12px">
-    <div class="adm-search"><input class="answer-in" id="q" type="search" placeholder="학생 이름이나 그룹으로 검색" autocomplete="off">
-      <label class="muted adm-toggle"><input type="checkbox" id="showout"> 내보낸 학생도 보기</label></div>
-    <p class="err" id="err">${esc(err || '')}</p>
-    <span class="label" id="cnt">학생 ${active}명</span>
-    <div class="adm-list">
-    ${rows.map(r => `<div class="expr adm-card" data-q="${esc((r.name + ' ' + (r.group || '개인')).toLowerCase())}" data-out="${r.active ? '' : '1'}" style="${r.active ? '' : 'opacity:.55'}">
-      <div class="head"><span class="en">${esc(r.name)} <span class="muted" style="font-weight:400;font-size:.85rem">${esc(r.group || '개인')}${r.active ? '' : ' · 내보냄'}${r.must_change ? ' · 비밀번호 미변경' : ''}</span></span></div>
+  if (!CFG.url && !GROUPS) GROUPS = store.get('nyft:groups', null);
+  const groups = [...new Set([...(GROUPS || []), ...rows.map(r => r.group).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'ko'));
+  const grpOpts = sel => `<option value="" ${sel ? '' : 'selected'}>개인</option>${groups.map(g => `<option value="${esc(g)}" ${g === sel ? 'selected' : ''}>${esc(g)}</option>`).join('')}`;
+  const card = r => `<div class="expr adm-card" data-q="${esc((r.name + ' ' + (r.group || '개인')).toLowerCase())}" data-out="${r.active ? '' : '1'}" style="${r.active ? '' : 'opacity:.55'}">
+      <div class="head"><span class="en">${esc(r.name)} <span class="muted" style="font-weight:400;font-size:.85rem">${r.active ? '' : '내보냄 · '}${r.must_change ? '비밀번호 미변경' : ''}</span></span>
+        <select class="adm-grp" data-grp="${esc(r.id)}" aria-label="반">${grpOpts(r.group || '')}</select></div>
       <p class="note">${summary(r)}</p>
       <details><summary class="muted" style="cursor:pointer;font-size:.9rem">볼 수 있는 수업 (${memosFor(r).length})</summary>
         <div class="stack adm-memos" style="gap:4px;margin-top:8px">${memoList.map(m => {
@@ -1925,14 +1921,46 @@ async function admin(err = '') {
         <button class="ghost" data-view="${esc(r.id)}">학생 화면 보기</button>
         <button class="ghost" data-act="reset" data-id="${esc(r.id)}">비밀번호 ${DEFAULT_PIN}으로 초기화</button>
         <button class="ghost" data-act="${r.active ? 'off' : 'on'}" data-id="${esc(r.id)}">${r.active ? '내보내기' : '다시 들이기'}</button>
-      </div></div>`).join('')}
-    </div>
+      </div></div>`;
+  const section = (title, list, kind) => `<div class="adm-sec" data-kind="${kind}"><div class="adm-sec-h"><span class="label">${esc(title)}</span><span class="muted adm-n"></span></div>
+    <div class="adm-list">${list.map(card).join('') || '<p class="muted adm-empty">아직 학생이 없어요.</p>'}</div></div>`;
+  app.innerHTML = `<div class="adm">
+  <div class="bar adm-bar"><span class="who">선생님 관리 화면</span><a class="ghost" href="#" style="text-decoration:none">학생 화면</a><button class="ghost" id="aout">나가기</button></div>
+  ${CFG.url ? '' : '<p class="feedback no">미리보기 모드예요. 여기서 바꾼 내용은 이 브라우저에만 저장돼요. (관리자 비밀번호: 5813)</p>'}
+  <div class="adm-cols">
+  <aside class="adm-side stack" style="gap:14px">
+    <button class="cta" id="viewall"><span><b>모든 수업 보기</b><small>메모 ${Object.keys(DATA.memos).length}개를 학생 화면 그대로 둘러봐요</small></span><span class="arrow">→</span></button>
+    <button class="cta adm-extra" id="viewfull"><span><b>숨긴 기능까지 써 보기</b><small>랜덤 퀴즈, 10분 복습, 문법 문제, 카드 등 학생에게 가려 둔 기능 전부</small></span><span class="arrow">→</span></button>
+    <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>반 관리 (${groups.length})</summary>
+      <div class="stack" style="gap:8px;margin-top:10px">
+        ${groups.map(g => `<div class="adm-grow"><span>${esc(g)} <span class="muted">${rows.filter(r => r.group === g && r.active).length}명</span></span><button class="ghost" data-delgrp="${esc(g)}">삭제</button></div>`).join('') || '<p class="muted" style="font-size:.85rem">아직 반이 없어요.</p>'}
+        <form id="addgrp" class="adm-grow"><input class="answer-in" id="gname" placeholder="새 반 이름 (예: 화목 7pm)" style="min-width:0"><button class="btn" style="width:auto;flex:none;white-space:nowrap;padding:0 18px">추가</button></form>
+      </div>
+    </details>
+    <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>학생 추가</summary>
+    <form id="add" class="stack" style="gap:10px;margin-top:10px">
+      <input class="answer-in" id="nn" placeholder="이름 (예: 민지님)">
+      <select class="answer-in" id="ng" aria-label="반">${grpOpts('')}</select>
+      <p class="muted" style="font-size:.85rem">처음 비밀번호는 ${DEFAULT_PIN}이고, 첫 로그인 때 학생이 직접 바꿔요.</p>
+      <button class="btn">추가하기</button>
+    </form></details>
+  </aside>
+  <section class="adm-main stack" style="gap:12px">
+    <div class="adm-search"><input class="answer-in" id="q" type="search" placeholder="학생 이름이나 그룹으로 검색" autocomplete="off">
+      <label class="muted adm-toggle"><input type="checkbox" id="showout"> 내보낸 학생도 보기</label></div>
+    <p class="err" id="err">${esc(err || '')}</p>
+    <span class="label" id="cnt">학생 ${active}명</span>
+    <h2 class="adm-cat">개인</h2>
+    ${section('개인 수업', rows.filter(r => !r.group), 'solo')}
+    <h2 class="adm-cat">그룹</h2>
+    ${groups.map(g => section(g, rows.filter(r => r.group === g), 'group')).join('') || '<p class="muted">아직 반이 없어요. 왼쪽 "반 관리"에서 추가하세요.</p>'}
     <p class="muted" id="none" hidden>찾는 학생이 없어요.</p>
   </section></div></div>`;
   const q = document.getElementById('q'), showout = document.getElementById('showout');
   const filter = () => {
     const t = q.value.trim().toLowerCase(); let n = 0;
     app.querySelectorAll('.adm-card').forEach(c => { const ok = (!t || c.dataset.q.includes(t)) && (showout.checked || !c.dataset.out); c.hidden = !ok; n += ok; });
+    app.querySelectorAll('.adm-sec').forEach(sec => { const k = sec.querySelectorAll('.adm-card:not([hidden])').length; sec.querySelector('.adm-n').textContent = `${k}명`; sec.hidden = !!t && !k; });
     document.getElementById('cnt').textContent = t ? `검색 결과 ${n}명` : `학생 ${n}명`;
     document.getElementById('none').hidden = n > 0;
     try { sessionStorage.setItem('adm-q', q.value); } catch {}
@@ -1950,8 +1978,25 @@ async function admin(err = '') {
     e.preventDefault();
     const name = document.getElementById('nn').value.trim(); if (!name) return;
     const id = 's-' + Math.random().toString(36).slice(2, 8);
-    await api.adminSave(adminTok, id, name, document.getElementById('ng').value.trim(), []); admin();
+    await api.adminSave(adminTok, id, name, document.getElementById('ng').value, []); admin();
   };
+  app.querySelectorAll('[data-grp]').forEach(sel => sel.onchange = async () => {
+    const r = byId[sel.dataset.grp];
+    await api.adminSave(adminTok, r.id, r.name, sel.value, r.memos || []); admin();
+  });
+  document.getElementById('addgrp').onsubmit = async e => {
+    e.preventDefault();
+    const g = document.getElementById('gname').value.trim(); if (!g) return;
+    if (groups.includes(g)) return toast('이미 있는 반이에요.');
+    await api.saveGroups(adminTok, [...groups, g]); GROUPS = [...groups, g]; admin();
+  };
+  app.querySelectorAll('[data-delgrp]').forEach(b => b.onclick = async () => {
+    const g = b.dataset.delgrp, inG = rows.filter(r => r.group === g);
+    if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = inG.length ? `삭제 (${inG.length}명은 개인으로)` : '정말 삭제'; return; }
+    for (const r of inG) await api.adminSave(adminTok, r.id, r.name, '', r.memos || []);
+    const left = groups.filter(x => x !== g);
+    await api.saveGroups(adminTok, left); GROUPS = left; admin();
+  });
   app.querySelectorAll('[data-memo]').forEach(c => c.onchange = async () => {
     const r = byId[c.dataset.memo];
     const picked = [...app.querySelectorAll(`[data-memo="${CSS.escape(r.id)}"]:checked:not(:disabled)`)].map(x => x.value);
