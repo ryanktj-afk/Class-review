@@ -1,5 +1,5 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>뉴욕프리토킹 복습노트</title>
+<title>RYAN's Class review</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -308,6 +308,53 @@ button:active:not(:disabled) { transform: scale(.97) }
 .chip.pick { cursor: pointer; border: 1px solid transparent; } .chip.pick.on { background: var(--accent); color: #fff; }
 .pill.timer { font-variant-numeric: tabular-nums; background: var(--accent); color: #fff; }
 .mode.ten { background: linear-gradient(135deg, var(--accent), #6a5cff); color: #fff; } .mode.ten h3 { color: #fff; } .mode.ten span:not(.ico) { color: rgba(255,255,255,.85); }
+/* 수업 복습: memo slides in the site design */
+.mv { display: grid; gap: 14px; min-width: 0 }
+.mv-tags { display: flex; flex-wrap: wrap; gap: 6px }
+.mv-chip { display: inline-block; background: var(--fill); color: var(--sub); border-radius: 8px; padding: 3px 9px; font-size: .85rem; font-weight: 600; margin: 1px 2px; line-height: 1.5 }
+.mv-tags .mv-chip { background: var(--surface); margin: 0 }
+.mv-toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 4; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; background: var(--bg); scrollbar-width: none }
+.mv-toc::-webkit-scrollbar { display: none }
+.mv-toc button { flex: 0 0 auto; border: 0; background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 600; color: var(--sub); font-size: .86rem; cursor: pointer }
+.mv-list { display: grid; gap: 14px }
+.mv-slide { background: var(--surface); border-radius: 24px; padding: 22px 20px; display: grid; gap: 16px; scroll-margin-top: 130px; min-width: 0 }
+.mv-slide header { display: grid; gap: 6px }
+.mv-slide h2 { font-size: 1.2rem; margin: 0; line-height: 1.4 }
+.mv-label { justify-self: start; font-size: .78rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; background: var(--accent-soft); color: var(--accent) }
+.k-work .mv-label { background: #e6f7ef; color: #0b8a5a }
+.k-grammar .mv-label { background: #fff3dc; color: #b86e00 }
+.k-nuance .mv-label { background: #efeaff; color: #6a4cff }
+.k-practice .mv-label { background: var(--fill); color: var(--sub) }
+.mv-body { display: grid; gap: 12px; font-size: 1rem; line-height: 1.65; color: var(--ink); min-width: 0; overflow-wrap: anywhere }
+.mv-body p { margin: 0 }
+.mv-flat, .mv-box { display: grid; gap: 8px; min-width: 0 }
+.mv-box { background: var(--fill); border-radius: 16px; padding: 14px 16px }
+.mv-box .mv-box { background: var(--surface); padding: 10px 12px; border-radius: 12px }
+.mv-quote { background: var(--accent-soft); border-radius: 16px; padding: 16px 18px; display: grid; gap: 10px; font-size: 1.06rem; line-height: 1.75 }
+.mv-body mark { background: none; color: var(--accent); font-weight: 700; padding: 0 }
+.mv-h { font-weight: 700; font-size: 1.02rem; color: var(--ink); line-height: 1.5 }
+.mv-ex { color: var(--sub); font-size: .95rem }
+.mv-ko { color: var(--accent); font-weight: 600; font-size: .9rem }
+.mv-grid { display: grid; gap: 10px; min-width: 0 }
+.mv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between }
+.mv-btn { border: 0; background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: 10px; padding: 8px 12px; font-size: .88rem; cursor: pointer; flex: 0 0 auto }
+.mv-btn.main { background: var(--accent); color: #fff }
+.mv-ans { background: var(--surface); border-radius: 12px; padding: 10px 12px; color: var(--accent); font-weight: 700 }
+.mv-ans[hidden] { display: none }
+.mv-in { width: auto; max-width: min(calc(100% - 8px), 15em); font: inherit; font-weight: 600; border: 0; border-bottom: 2px solid var(--accent); background: var(--surface); border-radius: 8px 8px 0 0; padding: 2px 8px; margin: 2px 4px; color: var(--ink);  }
+.mv-flat > p .mv-in, .mv-body > p .mv-in { background: var(--fill) }
+.mv-in:focus { outline: 2px solid var(--accent-soft) }
+.mv-in.ok { border-color: #12b76a; color: #0b8a5a }
+.mv-in.no { border-color: var(--bad); background: var(--bad-soft) }
+.mv-in.area { display: block; width: 100%; border-radius: 10px; border: 0; padding: 10px 12px; margin: 4px 0 }
+.mv-score { font-weight: 700; color: var(--accent); margin: 0 }
+.mv-body code { background: none; color: var(--accent); font-weight: 700; font-family: inherit }
+.mv-body table { display: block; overflow-x: auto; border-collapse: collapse; font-size: .92rem }
+.mv-body td, .mv-body th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top }
+.mv-body ul, .mv-body ol { margin: 0; padding-left: 1.2em }
+@media (min-width: 640px) { .mv-grid[data-cols="2"], .mv-grid[data-cols="3"], .mv-grid[data-cols="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (min-width: 960px) { .mv-slide { padding: 30px 32px } .mv-slide h2 { font-size: 1.4rem } .mv-toc { top: 0 } .mv-quote { font-size: 1.12rem } }
+@media (min-width: 1280px) { .mv-grid[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)) } }
 /* lite mode (only 수업 복습) */
 .modeswitch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--fill); border-radius: 16px; padding: 4px }
 .modeswitch button { border: 0; background: none; border-radius: 12px; padding: 12px 8px; font-weight: 700; font-size: 1rem; color: var(--muted); cursor: pointer }
@@ -577,7 +624,7 @@ async function login(err = '') {
   app.innerHTML = `
   <div class="stack welcome" style="gap:26px">
     <div class="hero">
-      <span class="label">뉴욕프리토킹 · 복습노트</span>
+      <span class="label">RYAN's Class review</span>
       <h1>Welcome to <mark>Ryan's</mark><br>class review.</h1>
       <p>수업 메모를 날짜별로 다시 보고, 그동안 배운 표현을 카드와 퀴즈로 연습해요.</p>
     </div>
@@ -707,7 +754,7 @@ function home() {
       <button class="mode" data-go="speakpick" style="grid-column:1/-1"><span class="ico">🗣️</span><h3>내 이야기 반복 말하기</h3><span>수업 때 내가 한 말을 한 문장씩 가리면서 말해요. 마지막엔 전부 가리고 혼자서</span></button>
       <button class="mode" data-go="words"><span class="ico">📒</span><h3>내 단어장</h3><span>${myWords().length ? `단어 ${myWords().length}개` : '문장 속 단어를 눌러서 모아요'}</span></button>
       <button class="mode" data-go="quiz"><span class="ico">🎲</span><h3>랜덤 퀴즈</h3><span>모든 수업에서 10문제. 약한 문제가 더 자주 나와요</span></button>
-      <button class="mode" data-go="dict" style="grid-column:1/-1"><span class="ico">📖</span><h3>모두의 표현 사전</h3><span>뉴욕프리토킹 수업에서 나온 표현 ${allExpr().length.toLocaleString()}개를 검색해 보세요</span></button>
+      <button class="mode" data-go="dict" style="grid-column:1/-1"><span class="ico">📖</span><h3>모두의 표현 사전</h3><span>RYAN's Class review 수업에서 나온 표현 ${allExpr().length.toLocaleString()}개를 검색해 보세요</span></button>
       <button class="mode" data-go="wrong" ${wrong ? '' : 'disabled'}><span class="ico">🎯</span><h3>틀린 문제 다시</h3><span>${wrong ? `틀린 적 있는 문제 ${wrong}개` : '아직 틀린 문제가 없어요'}</span></button>
     </div>
   </div>
@@ -755,23 +802,172 @@ function exprHTML(x) {
     ${x.examples.map(t => `<div class="ex">${sayBtn(t)}<span>${esc(t)}</span></div>`).join('')}
   </div>`;
 }
-const MEMO_URLS = {};
-// Small-screen fixes for the memo decks' own toolbar (they were made for wide screens).
-const MEMO_FIX = `<style id="nyft-fix">@media (max-width: 639px) { body { padding: 8px !important }
-  header > div { flex-wrap: wrap; justify-content: center; gap: 6px } header > div > * { margin-left: 0 !important }
-  header button { padding: 8px 12px !important; font-size: 13px !important; white-space: nowrap } header select { max-width: 100%; flex: 1 1 100% }
-  header [onclick="window.print()"] { display: none !important } }</style>`;
-async function memoUrl(m) {
-  if (MEMO_URLS[m.id]) return MEMO_URLS[m.id];
-  let h = null;
-  try { h = m.href ? await (await fetch(m.href)).text() : await api.getMemoHtml(me.token || adminTok, m.id); } catch { if (m.href) return m.href; throw new Error('no memo'); }
+// ---------- 수업 복습: the memo deck redrawn in the site's own design (Ryan 2026-10-31) ----------
+// The memo HTML is parsed, its slides kept in order, and every element mapped to a few plain site styles.
+// Sound buttons are dropped. Memos without slides are drawn from the extracted lesson data instead.
+const MEMO_HTML = {};
+async function memoText(m) {
+  if (MEMO_HTML[m.id] != null) return MEMO_HTML[m.id];
+  const h = m.href ? await (await fetch(m.href)).text() : await api.getMemoHtml(me.token || adminTok, m.id);
   if (!h) throw new Error('no memo');
-  h = h.includes('</head>') ? h.replace('</head>', MEMO_FIX + '</head>') : MEMO_FIX + h;
-  return MEMO_URLS[m.id] = URL.createObjectURL(new Blob([h], { type: 'text/html' }));
+  return MEMO_HTML[m.id] = h;
 }
+const cls = el => ' ' + (el.getAttribute('class') || '') + ' ';
+const has = (el, ...ks) => ks.some(k => cls(el).includes(' ' + k + ' ') || (k.endsWith('-') && cls(el).includes(' ' + k)));
+function mvClean(src, depth = 0) {
+  const out = document.createDocumentFragment();
+  for (const n of src.childNodes) {
+    if (n.nodeType === 3) { const t = n.textContent.replace(/🔊\s*(문장\s*)?듣기/g, ''); if (t) out.append(t); continue; }
+    if (n.nodeType !== 1) continue;
+    const tag = n.tagName.toLowerCase(), oc = n.getAttribute('onclick') || '';
+    if (['svg', 'script', 'style', 'select', 'audio', 'video', 'canvas'].includes(tag)) continue;
+    if (has(n, 'tts-btn') || /playText|speak\(|speechSynthesis|exportToPDF|print|changeFontScale|toggleContinuousMode|prevSlide|nextSlide/.test(oc)) continue;
+    if (tag === 'button' || (oc && tag !== 'div')) {
+      const t = n.textContent.trim(); let act = '', id = '';
+      const pm = oc.match(/(?:togglePAnswer|toggleDrillAns|toggleQuizAnswer)\(['"]([^'"]+)/);
+      if (pm) { act = 'ans'; id = pm[1]; }
+      else if (/toggleGroupAnswers/.test(oc)) act = 'all';
+      else if (/check/i.test(oc)) act = 'check';
+      else if (/reset/i.test(oc)) act = 'reset';
+      if (!act) { if (tag !== 'button') { const s = document.createElement('span'); s.append(mvClean(n, depth)); out.append(s); } continue; }
+      const b = document.createElement('button');
+      b.className = 'mv-btn' + (act === 'check' ? ' main' : '');
+      b.dataset.act = act; if (id) b.dataset.id = id;
+      b.textContent = act === 'ans' ? '답 보기' : act === 'all' ? '모범 답안 모두 보기' : act === 'check' ? '정답 확인' : '다시 풀기';
+      out.append(b); continue;
+    }
+    if (tag === 'input') {
+      if ((n.getAttribute('type') || 'text') !== 'text') continue;
+      const i = document.createElement('input'); i.className = 'mv-in'; i.type = 'text'; i.autocomplete = 'off'; i.setAttribute('autocapitalize', 'off'); i.spellcheck = false;
+      const a = n.getAttribute('data-answer'); if (a) i.dataset.answer = a;
+      i.placeholder = n.getAttribute('placeholder') || ''; i.size = Math.max(5, Math.min(16, (a || '').split(',')[0].length + 1 || 8));
+      out.append(i); continue;
+    }
+    if (tag === 'textarea') { const t = document.createElement('textarea'); t.className = 'mv-in area'; t.rows = 2; out.append(t); continue; }
+    if (has(n, 'border-t') && /Slide \d+ of \d+/i.test(n.textContent)) continue; // deck footer
+    let el;
+    const kids = () => mvClean(n, depth + 1);
+    if (has(n, 'highlight-phrase')) { el = document.createElement('mark'); el.append(kids()); out.append(el); continue; }
+    if (['h1', 'h2', 'h3', 'h4'].includes(tag)) { el = document.createElement('h3'); el.className = 'mv-h'; }
+    else if (['strong', 'b', 'em', 'i', 'code', 'br', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'sup', 'sub', 'u'].includes(tag)) el = document.createElement(tag === 'i' ? 'em' : tag);
+    else if (tag === 'p') { el = document.createElement('p'); if (has(n, 'bg-')) el.className = 'mv-ex'; }
+    else if (tag === 'span' || tag === 'label' || tag === 'a') {
+      if (has(n, 'tag-pill') || (has(n, 'rounded-lg', 'rounded-md', 'rounded', 'rounded-full') && has(n, 'px-'))) { el = document.createElement('span'); el.className = 'mv-chip'; }
+      else if (has(n, 'block')) { el = document.createElement('div'); el.className = has(n, 'font-bold', 'font-extrabold') ? 'mv-h' : ''; }
+      else if (has(n, 'font-bold', 'font-extrabold', 'font-semibold')) el = document.createElement('b');
+      else el = document.createElement('span');
+    } else { // div, section, etc.
+      el = document.createElement('div');
+      const id = n.getAttribute('id') || '';
+      if (/^ans-|answer|-ans/.test(id) || (has(n, 'hidden') && has(n, 'p-prod-group'))) { el.className = 'mv-ans'; el.id = 'mv-' + id; el.hidden = true; }
+      else if (/feedback/.test(id)) { el.className = 'mv-fb'; }
+      else if (has(n, 'border-l-4')) el.className = 'mv-quote';
+      else if (has(n, 'grid') && /grid-cols-[2-9]/.test(cls(n))) { el.className = 'mv-grid'; el.dataset.cols = Math.max(...(cls(n).match(/grid-cols-(\d)/g) || ['grid-cols-1']).map(x => +x.slice(-1))); }
+      else if (has(n, 'rounded-2xl', 'rounded-xl', 'rounded-lg', 'rounded') && has(n, 'p-', 'px-', 'py-') && has(n, 'bg-', 'border')) {
+        el.className = depth <= 2 && has(n, 'bg-white') && !n.closest('[class*="grid-cols"]') ? 'mv-flat' : 'mv-box';
+      }
+      else if (has(n, 'font-bold', 'font-extrabold') && n.children.length <= 3) el.className = 'mv-h';
+      else if (has(n, 'flex') && has(n, 'justify-between', 'justify-end')) el.className = 'mv-row';
+      if (has(n, 'hidden') && !el.hidden && !/^ans-/.test(id)) { el.className = (el.className + ' mv-ans').trim(); el.hidden = true; if (id) el.id = 'mv-' + id; }
+    }
+    el.append(kids());
+    if (el.tagName === 'DIV' && !el.className && !el.textContent.trim() && !el.querySelector('input, textarea')) continue;
+    out.append(el);
+  }
+  return out;
+}
+// Grid containers would split loose text and bold words into separate rows; keep each inline run in one paragraph.
+const MV_INLINE = new Set(['B', 'STRONG', 'EM', 'CODE', 'SPAN', 'MARK', 'INPUT', 'BR', 'U', 'SUP', 'SUB']);
+function mvWrapInline(root) {
+  for (const el of [root, ...root.querySelectorAll('.mv-box, .mv-flat, .mv-quote, .mv-ans, div:not([class])')]) {
+    if (el.classList.contains('mv-chip')) continue;
+    let run = [];
+    const flush = () => { if (run.some(n => n.nodeType === 1 || n.textContent.trim())) { const p = document.createElement('p'); run[0].before(p); p.append(...run); } run = []; };
+    for (const n of [...el.childNodes]) {
+      const inline = n.nodeType === 3 || (n.nodeType === 1 && MV_INLINE.has(n.tagName) && !n.classList.contains('mv-chip'));
+      if (inline) run.push(n); else flush();
+    }
+    if (run.length && run.length !== el.childNodes.length) flush(); else if (run.length && el !== root && !el.matches('.mv-ans')) flush();
+  }
+}
+function mvSlides(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const slides = [...doc.querySelectorAll('.slide')];
+  if (!slides.length) return null;
+  const tags = [...slides[0].querySelectorAll('.tag-pill')].map(t => t.textContent.trim());
+  return { tags, slides: slides.map((s, i) => {
+    const raw = (s.getAttribute('data-title') || `${i + 1}`).replace(/^\s*\d+\.\s*/, '');
+    const lm = raw.match(/^\[([^\]]+)\]\s*(.*)$/);
+    return { label: lm ? lm[1] : '', title: lm ? lm[2] : raw, node: s };
+  }).filter((s, i) => i > 0 && !/^(index|목차|표지)$/i.test(s.title.trim())) };
+}
+function mvKind(label, title) {
+  const t = label + ' ' + title;
+  if (/직무|work|business/i.test(t)) return 'work';
+  if (/어법|문법|grammar/i.test(t)) return 'grammar';
+  if (/뉘앙스|비교/i.test(t)) return 'nuance';
+  if (/practice|production|연습|영작|drill|quiz|answer|정답/i.test(t)) return 'practice';
+  return 'daily';
+}
+function memoView(m, box) {
+  const h = MEMO_HTML[m.id];
+  const parsed = h ? mvSlides(h) : null;
+  let parts;
+  if (parsed) parts = parsed.slides.map(s => ({ label: s.label, title: s.title, body: mvClean(s.node) }));
+  else parts = mvFromData(m);
+  const chips = (parsed?.tags.length ? parsed.tags : m.expressions.slice(0, 16).map(x => x.expr)).slice(0, 24);
+  box.innerHTML = `${chips.length ? `<div class="mv-tags">${chips.map(t => `<span class="mv-chip">${esc(t)}</span>`).join('')}</div>` : ''}
+    <nav class="mv-toc" aria-label="목차">${parts.map((p, i) => `<button data-to="${i}">${esc(p.label || p.title)}</button>`).join('')}</nav>
+    <div class="mv-list"></div>`;
+  const list = box.querySelector('.mv-list');
+  parts.forEach((p, i) => {
+    const sec = document.createElement('section'); sec.className = `mv-slide k-${mvKind(p.label, p.title)}`; sec.id = `mv-s${i}`;
+    sec.innerHTML = `<header>${p.label ? `<span class="mv-label">${esc(p.label)}</span>` : ''}<h2>${esc(p.title)}</h2></header>`;
+    const body = document.createElement('div'); body.className = 'mv-body';
+    if (typeof p.body === 'string') body.innerHTML = p.body; else body.append(p.body);
+    mvWrapInline(body);
+    sec.append(body); list.append(sec);
+  });
+  box.querySelectorAll('.mv-toc [data-to]').forEach(b => b.onclick = () => document.getElementById(`mv-s${b.dataset.to}`).scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  box.onclick = e => {
+    const b = e.target.closest('.mv-btn'); if (!b) return;
+    const sec = b.closest('.mv-slide');
+    if (b.dataset.act === 'ans') {
+      const a = sec.querySelector(`#mv-${CSS.escape(b.dataset.id)}`) || b.closest('.mv-box')?.querySelector('.mv-ans');
+      if (a) { a.hidden = !a.hidden; b.textContent = a.hidden ? '답 보기' : '답 숨기기'; }
+    } else if (b.dataset.act === 'all') {
+      const as = [...sec.querySelectorAll('.mv-ans')], show = as.some(a => a.hidden);
+      as.forEach(a => a.hidden = !show); sec.querySelectorAll('.mv-btn[data-act="ans"]').forEach(x => x.textContent = show ? '답 숨기기' : '답 보기');
+      b.textContent = show ? '모범 답안 모두 숨기기' : '모범 답안 모두 보기';
+    } else if (b.dataset.act === 'check' || b.dataset.act === 'reset') {
+      const ins = [...sec.querySelectorAll('.mv-in[data-answer]')]; let ok = 0;
+      ins.forEach(i => {
+        i.classList.remove('ok', 'no');
+        if (b.dataset.act === 'reset') { i.value = ''; return; }
+        const good = i.dataset.answer.split(',').map(norm).includes(norm(i.value));
+        if (good) ok++; i.classList.add(good ? 'ok' : 'no');
+        if (!good && i.value.trim()) i.title = '정답: ' + i.dataset.answer.split(',')[0];
+      });
+      let fb = sec.querySelector('.mv-score'); if (!fb) { fb = document.createElement('p'); fb.className = 'mv-score'; b.closest('.mv-row, .mv-body').after(fb); }
+      fb.textContent = b.dataset.act === 'reset' ? '' : `${ins.length}문제 중 ${ok}개 맞았어요${ok < ins.length ? ' · 빨간 칸을 다시 채워 보세요' : ' 👏'}`;
+      if (b.dataset.act === 'check') sec.querySelectorAll('.mv-in.no').forEach(i => { i.placeholder = i.dataset.answer.split(',')[0].replace(/./g, (c, k) => k ? '·' : c); });
+    }
+  };
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('.mv-in')) { e.preventDefault(); e.target.closest('.mv-slide').querySelector('.mv-btn[data-act="check"]')?.click(); } });
+}
+// Memos that are apps, not slide decks: same sections, built from the lesson data.
+function mvFromData(m) {
+  const parts = [];
+  if ((m.sentences || []).length) parts.push({ label: '내 이야기', title: '수업 때 내가 한 말', body: `<div class="mv-quote">${m.sentences.map(x => `<p>${markHl(x.en, x.hl)}</p>`).join('')}</div>${m.sentences.some(x => x.ko) ? `<div class="mv-box"><p>${m.sentences.map(x => esc(x.ko || '')).filter(Boolean).join(' ')}</p></div>` : ''}` });
+  for (let i = 0; i < m.expressions.length; i += 4) parts.push({ label: `핵심 표현 ${i / 4 + 1}`, title: m.expressions.slice(i, i + 4).map(x => x.expr).join(' · '), body: `<div class="mv-grid" data-cols="2">${m.expressions.slice(i, i + 4).map(x => `<div class="mv-box"><div class="mv-h">${esc(x.expr)}${x.meaning ? ` <span class="mv-ko">${esc(x.meaning)}</span>` : ''}</div>${x.situation ? `<p>${esc(x.situation)}</p>` : ''}${x.nuance ? `<p>뉘앙스 · ${esc(x.nuance)}</p>` : ''}${x.examples.map(t => `<p class="mv-ex">${esc(t)}</p>`).join('')}</div>`).join('')}</div>` });
+  for (let i = 0; i < m.fill.length; i += 5) parts.push({ label: `Practice ${i / 5 + 1}`, title: `빈칸 채우기 Q${String(i + 1).padStart(2, '0')}-Q${String(Math.min(i + 5, m.fill.length)).padStart(2, '0')}`, body: `<div class="mv-row"><button class="mv-btn main" data-act="check">정답 확인</button><button class="mv-btn" data-act="reset">다시 풀기</button></div>${m.fill.slice(i, i + 5).map((q, k) => `<div class="mv-box"><p><b>Q${String(i + k + 1).padStart(2, '0')}</b> ${esc(q.before)} <input class="mv-in" data-answer="${esc(q.answers.join(','))}" size="${Math.max(6, q.answers[0].length + 2)}" autocomplete="off" autocapitalize="off" spellcheck="false"> ${esc(q.after)}</p>${q.ko ? `<p class="mv-ex">${esc(q.ko)}</p>` : ''}</div>`).join('')}` });
+  if (m.production.length) parts.push({ label: 'Production', title: '한국어를 영어로 말해 보기', body: `<div class="mv-row"><button class="mv-btn" data-act="all">모범 답안 모두 보기</button></div>${m.production.map((q, k) => `<div class="mv-box"><div class="mv-row"><span><b>Q${k + 1}</b> ${esc(q.ko)}</span><button class="mv-btn" data-act="ans" data-id="d${k}">답 보기</button></div><div class="mv-ans" id="mv-d${k}" hidden>${esc(q.en)}</div></div>`).join('')}` });
+  return parts;
+}
+
 function lesson(id, tab) {
   const m = DATA.memos[id];
-  const hasMemo = !!(m.href || m.hasHtml);
+  const hasMemo = true; // memos without slides are drawn from the lesson data
   // Ryan 2026-10-31: 수업 복습 = the original memo HTML; the practice tabs below are now called 반복 말하기.
   const practiceTab = (m.sentences || []).length ? 'speak' : 'expr';
   tab = tab || (hasMemo ? 'memo' : practiceTab);
@@ -780,7 +976,7 @@ function lesson(id, tab) {
   if (tab === 'speak') { const s = speakStatus(m); body = `<div class="expr stack" style="gap:10px"><p style="margin:0">수업 때 내가 한 이야기를 단계별로 다시 말해 봐요. 처음엔 전체를 보고 읽고, 그다음엔 한 문장씩, 점점 더 많은 문장을 가리다가 마지막엔 전부 가린 채 혼자 말해요.</p>
     <p class="muted" style="margin:0">${s.parts.length}부분 · 문장 ${s.parts.reduce((a, p) => a + p.units.length, 0)}개 · ${s.text}</p><div class="meter" style="width:100%"><i style="width:${s.pct}%"></i></div>
     <button class="btn" id="speakgo">${s.pct && s.pct < 100 ? '이어서 말하기' : s.pct === 100 ? '처음부터 다시' : '말하기 시작'}</button></div>`; }
-  if (tab === 'memo') body = `<div class="memo-frame"><p class="muted" id="memoload" style="padding:24px">수업 메모를 불러오는 중…</p></div>`;
+  if (tab === 'memo') body = `<div class="mv"><p class="muted" id="memoload" style="padding:24px 4px">수업 메모를 불러오는 중…</p></div>`;
   if (tab === 'expr') body = m.expressions.map(exprHTML).join('');
   if (tab === 'fill') body = `<button class="btn" id="go">이 수업 빈칸 문제 풀기</button>` + m.fill.map(q => `<div class="expr"><p>${esc(q.before)} <mark>${esc(q.answers[0])}</mark>${/^[.,?!]/.test(q.after) ? '' : ' '}${esc(q.after)}</p><p class="note">${esc(q.ko)}</p></div>`).join('');
   if (tab === 'sent') body = m.sentences.map(x => `<div class="expr"><div class="ex" style="border:0;padding:0">${sayBtn(x.en)}<span>${markHl(x.en, x.hl)}</span></div>${x.ko ? `<p class="note">${esc(x.ko)}</p>` : ''}</div>`).join('');
@@ -790,7 +986,6 @@ function lesson(id, tab) {
     <div class="stack" style="gap:6px">
       <span class="label">${m.date.replace(/-/g, '.')} 수업</span>
       <h1 style="font-size:1.6rem">${esc(m.topic)}</h1>
-      ${tab === 'memo' ? `<a class="memo-link" href="#" id="memohtml">새 창에서 크게 보기 →</a>` : ''}
     </div>
     ${hasMemo ? `<div class="modeswitch" role="tablist"><button role="tab" aria-selected="${tab === 'memo'}" data-tab="memo">📄 수업 복습</button><button role="tab" aria-selected="${tab !== 'memo'}" data-tab="${practiceTab}">🗣️ 반복 말하기</button></div>` : ''}
     ${tab === 'memo' ? '' : `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}</button>`).join('')}</div>`}
@@ -798,15 +993,10 @@ function lesson(id, tab) {
   </div>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => lesson(id, b.dataset.tab));
   if (tab === 'prod') bindReveal();
-  const mh = document.getElementById('memohtml');
-  if (mh) mh.onclick = async e => {
-    e.preventDefault(); const w = window.open('', '_blank');
-    try { const url = await memoUrl(m); if (w) w.location = url; else location.href = url; } catch { if (w) w.close(); }
-  };
-  if (tab === 'memo') memoUrl(m).then(url => {
-    const box = app.querySelector('.memo-frame'); if (!box) return;
-    box.innerHTML = `<iframe title="${esc(m.topic)} 수업 메모" src="${url}"></iframe>`;
-  }).catch(() => { const l = document.getElementById('memoload'); if (l) l.textContent = '수업 메모를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; });
+  if (tab === 'memo') {
+    const draw = () => { const box = app.querySelector('.mv'); if (box) memoView(m, box); };
+    (m.href || m.hasHtml ? memoText(m) : Promise.resolve()).then(draw).catch(draw);
+  }
   const selTab = app.querySelector('.tab[aria-selected="true"]'); if (selTab) selTab.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   const sg = document.getElementById('speakgo'); if (sg) sg.onclick = () => state[speakKey(id)]?.done ? speak(id, 0, 0) : speak(id);
   const go = document.getElementById('go');
@@ -1645,7 +1835,7 @@ function layout(name) {
   if (!EXTRAS) {
     tb.innerHTML = '';
     const ms = lessonsOf(me);
-    side.innerHTML = `<div class="brand">Ryan's class review</div><div class="side-who">${esc(me.name)}${me.group ? ` · ${esc(me.group)}` : ''}${me.viewOnly ? ' · 선생님 보기' : ''}</div>
+    side.innerHTML = `<div class="brand">RYAN's Class review</div><div class="side-who">${esc(me.name)}${me.group ? ` · ${esc(me.group)}` : ''}${me.viewOnly ? ' · 선생님 보기' : ''}</div>
       <button class="nav" data-go="home" ${name === 'home' ? 'aria-current="page"' : ''}><span class="i">🗂️</span>수업 복습</button>
       <div class="side-list">${ms.map(m => `<button class="nav sub" data-go="lesson:${m.id}" ${curLesson === m.id && name !== 'home' ? 'aria-current="page"' : ''}><span class="d">${fmtDate(m.date)}</span><span class="tt">${esc(m.topic)}</span></button>`).join('')}</div>
       <div class="side-foot">${me.viewOnly ? '<a class="ghost" href="#admin" style="text-decoration:none">관리 화면</a>' : '<button class="ghost" data-go="pin">비밀번호</button><button class="ghost" data-go="logout">나가기</button>'}</div>`;
@@ -1654,7 +1844,7 @@ function layout(name) {
   const act = SCREEN_NAV[name] || GO_NAV[lastGo] || (/^gunit:/.test(lastGo) ? 'grammar' : 'home');
   const due = dueCards().length;
   const item = ([k, ico, label]) => `<button class="nav" data-go="${k}" ${k === act ? 'aria-current="page"' : ''}><span class="i">${ico}</span>${label}${k === 'cards' && due ? `<span class="badge">${due}</span>` : ''}</button>`;
-  side.innerHTML = `<div class="brand">Ryan's class review</div><div class="side-who">${esc(me.name)}${me.group ? ` · ${esc(me.group)}` : ''}${me.viewOnly ? ' · 선생님 보기' : ''}</div>
+  side.innerHTML = `<div class="brand">RYAN's Class review</div><div class="side-who">${esc(me.name)}${me.group ? ` · ${esc(me.group)}` : ''}${me.viewOnly ? ' · 선생님 보기' : ''}</div>
     ${NAV.map(item).join('')}
     <div class="side-foot">${me.viewOnly ? '<a class="ghost" href="#admin" style="text-decoration:none">관리 화면</a>' : '<button class="ghost" data-go="pin">비밀번호</button><button class="ghost" data-go="logout">나가기</button>'}</div>`;
   tb.innerHTML = NAV.filter(n => n[3]).map(([k, ico, , short]) => `<button data-go="${k}" ${k === act ? 'aria-current="page"' : ''}><span class="i">${ico}</span>${short}${k === 'cards' && due ? `<span class="dot"></span>` : ''}</button>`).join('');
