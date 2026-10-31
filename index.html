@@ -313,24 +313,35 @@ button:active:not(:disabled) { transform: scale(.97) }
 .mv-tags { display: flex; flex-wrap: wrap; gap: 6px }
 .mv-chip { display: inline-block; background: var(--fill); color: var(--sub); border-radius: 8px; padding: 3px 9px; font-size: .85rem; font-weight: 600; margin: 1px 2px; line-height: 1.5 }
 .mv-tags .mv-chip { background: var(--surface); margin: 0 }
-.mv-toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 4; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; background: var(--bg); scrollbar-width: none }
-.mv-toc::-webkit-scrollbar { display: none }
-.mv-toc button { flex: 0 0 auto; border: 0; background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 600; color: var(--sub); font-size: .86rem; cursor: pointer }
-.mv-list { display: grid; gap: 14px }
-.mv-slide { background: var(--surface); border-radius: 24px; padding: 22px 20px; display: grid; gap: 16px; scroll-margin-top: 130px; min-width: 0 }
-.mv-slide header { display: grid; gap: 6px }
-.mv-slide h2 { font-size: 1.2rem; margin: 0; line-height: 1.4 }
-.mv-label { justify-self: start; font-size: .78rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; background: var(--accent-soft); color: var(--accent) }
+.mv-label { justify-self: start; font-size: .76rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; background: var(--accent-soft); color: var(--accent) }
 .k-work .mv-label { background: #e6f7ef; color: #0b8a5a }
 .k-grammar .mv-label { background: #fff3dc; color: #b86e00 }
 .k-nuance .mv-label { background: #efeaff; color: #6a4cff }
 .k-practice .mv-label { background: var(--fill); color: var(--sub) }
-.mv-body { display: grid; gap: 12px; font-size: 1rem; line-height: 1.65; color: var(--ink); min-width: 0; overflow-wrap: anywhere }
+.mv-stage { position: relative; overflow-y: auto; overscroll-behavior: contain; border-radius: 24px; background: var(--surface); touch-action: pan-y }
+.mv-page { padding: 18px 18px 20px; display: grid; gap: 12px; align-content: start; min-width: 0; animation: mvin .2s ease }
+@keyframes mvin { from { opacity: 0; transform: translateX(10px) } to { opacity: 1; transform: none } }
+.mv-page header { display: grid; gap: 5px }
+.mv-page h2 { font-size: 1.08rem; margin: 0; line-height: 1.4 }
+.mv-page h2 small { color: var(--muted); font-weight: 600; font-size: .8em }
+body:has(.memo-mode) .wrap { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important }
+.mv-cover .mv-tags .mv-chip { background: var(--fill) }
+.mv-cover { align-content: center; min-height: 100%; gap: 14px }
+.mv-cover h2 { font-size: 1.5rem }
+.mv-nav { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; padding-top: 10px }
+.mv-nav button { border: 0; border-radius: 14px; font-weight: 700; font-size: 1rem; min-height: 50px; cursor: pointer }
+.mv-prev { background: var(--surface); color: var(--sub) }
+.mv-next { background: var(--accent); color: #fff }
+.mv-nav button:disabled { opacity: .35; cursor: default }
+.mv-pos { background: none; color: var(--sub); padding: 0 10px; font-variant-numeric: tabular-nums }
+.mv-pos b { color: var(--ink) } .mv-pos span { color: var(--muted); font-weight: 600; font-size: .85rem }
+.memo-mode .modeswitch button { padding: 9px 8px; font-size: .95rem }
+.mv-body { display: grid; gap: 10px; font-size: .95rem; line-height: 1.6; color: var(--ink); min-width: 0; overflow-wrap: anywhere }
 .mv-body p { margin: 0 }
 .mv-flat, .mv-box { display: grid; gap: 8px; min-width: 0 }
-.mv-box { background: var(--fill); border-radius: 16px; padding: 14px 16px }
+.mv-box { background: var(--fill); border-radius: 14px; padding: 12px 14px }
 .mv-box .mv-box { background: var(--surface); padding: 10px 12px; border-radius: 12px }
-.mv-quote { background: var(--accent-soft); border-radius: 16px; padding: 16px 18px; display: grid; gap: 10px; font-size: 1.06rem; line-height: 1.75 }
+.mv-quote { background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; display: grid; gap: 8px; font-size: 1rem; line-height: 1.7 }
 .mv-body mark { background: none; color: var(--accent); font-weight: 700; padding: 0 }
 .mv-h { font-weight: 700; font-size: 1.02rem; color: var(--ink); line-height: 1.5 }
 .mv-ex { color: var(--sub); font-size: .95rem }
@@ -353,7 +364,7 @@ button:active:not(:disabled) { transform: scale(.97) }
 .mv-body td, .mv-body th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top }
 .mv-body ul, .mv-body ol { margin: 0; padding-left: 1.2em }
 @media (min-width: 640px) { .mv-grid[data-cols="2"], .mv-grid[data-cols="3"], .mv-grid[data-cols="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
-@media (min-width: 960px) { .mv-slide { padding: 30px 32px } .mv-slide h2 { font-size: 1.4rem } .mv-toc { top: 0 } .mv-quote { font-size: 1.12rem } }
+@media (min-width: 960px) { .mv-page { padding: 30px 36px; gap: 16px } .mv-page h2 { font-size: 1.35rem } .mv-body { font-size: 1.05rem; gap: 12px } .mv-quote { font-size: 1.15rem; padding: 18px 22px } .mv-box { padding: 14px 18px } .mv-cover h2 { font-size: 2rem } .mv-nav { padding-top: 14px } .mv-nav button { min-height: 54px } }
 @media (min-width: 1280px) { .mv-grid[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)) } }
 /* lite mode (only 수업 복습) */
 .modeswitch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--fill); border-radius: 16px; padding: 4px }
@@ -912,33 +923,117 @@ function mvKind(label, title) {
 function memoView(m, box) {
   const h = MEMO_HTML[m.id];
   const parsed = h ? mvSlides(h) : null;
-  let parts;
-  if (parsed) parts = parsed.slides.map(s => ({ label: s.label, title: s.title, body: mvClean(s.node) }));
-  else parts = mvFromData(m);
+  const parts = parsed ? parsed.slides.map(s => ({ label: s.label, title: s.title, body: mvClean(s.node) })) : mvFromData(m);
   const chips = (parsed?.tags.length ? parsed.tags : m.expressions.slice(0, 16).map(x => x.expr)).slice(0, 24);
-  box.innerHTML = `${chips.length ? `<div class="mv-tags">${chips.map(t => `<span class="mv-chip">${esc(t)}</span>`).join('')}</div>` : ''}
-    <nav class="mv-toc" aria-label="목차">${parts.map((p, i) => `<button data-to="${i}">${esc(p.label || p.title)}</button>`).join('')}</nav>
-    <div class="mv-list"></div>`;
-  const list = box.querySelector('.mv-list');
-  parts.forEach((p, i) => {
-    const sec = document.createElement('section'); sec.className = `mv-slide k-${mvKind(p.label, p.title)}`; sec.id = `mv-s${i}`;
-    sec.innerHTML = `<header>${p.label ? `<span class="mv-label">${esc(p.label)}</span>` : ''}<h2>${esc(p.title)}</h2></header>`;
-    const body = document.createElement('div'); body.className = 'mv-body';
+  // Ryan 2026-10-31: no long scrolling. Each slide is cut into pages that fit the screen; 이전/다음 turn them.
+  const slides = parts.map(p => {
+    const body = document.createElement('div');
     if (typeof p.body === 'string') body.innerHTML = p.body; else body.append(p.body);
     mvWrapInline(body);
-    sec.append(body); list.append(sec);
+    return { ...p, kind: mvKind(p.label, p.title), units: mvUnits(body) };
   });
-  box.querySelectorAll('.mv-toc [data-to]').forEach(b => b.onclick = () => document.getElementById(`mv-s${b.dataset.to}`).scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  box.innerHTML = `<div class="mv-stage"></div>
+    <div class="mv-nav"><button class="mv-prev" aria-label="이전">‹ 이전</button><button class="mv-pos"></button><button class="mv-next" aria-label="다음">다음 ›</button></div>`;
+  const stage = box.querySelector('.mv-stage');
+  let pages = [], cur = 0;
+  const cover = () => { const c = document.createElement('div'); c.className = 'mv-page mv-cover';
+    c.innerHTML = `<span class="mv-label">${esc(m.date ? m.date.replace(/-/g, '.') : '')} 수업</span><h2>${esc(m.topic)}</h2>
+      ${chips.length ? `<div class="mv-tags">${chips.slice(0, innerWidth < 960 ? 12 : 24).map(t => `<span class="mv-chip">${esc(t)}</span>`).join('')}</div>` : ''}
+      <p class="muted" style="margin:0">${slides.length}개 파트 · 오른쪽 '다음'을 눌러 넘겨 보세요</p>`; return { el: c, slide: -1 }; };
+  function paginate() {
+    const keep = pages[cur]?.slide ?? -1;
+    window.scrollTo(0, 0);
+    const navH = box.querySelector('.mv-nav').offsetHeight;
+    const top = stage.getBoundingClientRect().top;
+    let hgt = Math.max(320, Math.floor(window.innerHeight - top - navH - (innerWidth >= 960 ? 28 : 12)));
+    stage.style.height = hgt + 'px';
+    const extra = document.documentElement.scrollHeight - window.innerHeight; // page padding below: keep the whole viewer on one screen
+    if (extra > 0) { hgt = Math.max(320, hgt - extra); stage.style.height = hgt + 'px'; }
+    stage.innerHTML = '';
+    pages = [cover()];
+    slides.forEach((s, si) => {
+      let page, bodyEl, n = 0, part = 0;
+      const start = () => {
+        part++;
+        page = document.createElement('section'); page.className = `mv-page k-${s.kind}`;
+        page.innerHTML = `<header>${s.label ? `<span class="mv-label">${esc(s.label)}</span>` : ''}<h2>${esc(s.title)}${part > 1 ? ' <small>(이어서)</small>' : ''}</h2></header>`;
+        bodyEl = document.createElement('div'); bodyEl.className = 'mv-body'; page.append(bodyEl);
+        const ctrl = s.units.find(u => u.ctrl); if (ctrl) bodyEl.append(ctrl.node.cloneNode(true));
+        stage.append(page); n = 0;
+      };
+      const finish = () => { page.remove(); pages.push({ el: page, slide: si }); };
+      start();
+      for (const u of s.units) {
+        if (u.ctrl) continue;
+        const put = () => {
+          let parent = bodyEl;
+          if (u.wrap) {
+            const last = bodyEl.lastElementChild;
+            if (last && last.dataset.wrap === u.wrap.key) parent = last;
+            else { parent = document.createElement('div'); parent.className = u.wrap.cls; parent.dataset.wrap = u.wrap.key; if (u.wrap.cols) parent.dataset.cols = u.wrap.cols; bodyEl.append(parent); }
+          }
+          parent.append(u.node); return parent;
+        };
+        const parent = put(); n++;
+        if (page.scrollHeight > hgt + 1 && n > 1) {
+          u.node.remove(); if (parent !== bodyEl && !parent.children.length) parent.remove();
+          finish(); start(); put(); n = 1;
+        }
+      }
+      finish();
+    });
+    cur = Math.max(0, pages.findIndex(p => p.slide === keep));
+    show(cur);
+  }
+  function show(i) {
+    cur = Math.max(0, Math.min(pages.length - 1, i));
+    stage.replaceChildren(pages[cur].el); stage.scrollTop = 0;
+    box.querySelector('.mv-prev').disabled = cur === 0;
+    const nx = box.querySelector('.mv-next'); nx.disabled = cur === pages.length - 1;
+    box.querySelector('.mv-pos').innerHTML = `<b>${cur + 1}</b> / ${pages.length} <span>· 목차</span>`;
+  }
+  box.querySelector('.mv-prev').onclick = () => show(cur - 1);
+  box.querySelector('.mv-next').onclick = () => show(cur + 1);
+  box.querySelector('.mv-pos').onclick = () => {
+    const bg = document.createElement('div'); bg.className = 'sheet-bg';
+    bg.innerHTML = `<div class="sheet"><h2 style="margin:0">목차</h2><div class="group">${[{ label: '', title: '표지' }, ...slides].map((s, k) => {
+      const at = k ? pages.findIndex(p => p.slide === k - 1) : 0;
+      return `<button class="lesson" data-at="${at}"><span class="t"><h3>${esc(s.title)}</h3>${s.label ? `<p>${esc(s.label)}</p>` : ''}</span><span class="muted">${at + 1}</span></button>`; }).join('')}</div></div>`;
+    bg.onclick = e => { const b = e.target.closest('[data-at]'); if (b) show(+b.dataset.at); if (b || e.target === bg) bg.remove(); };
+    document.body.append(bg);
+  };
+  // Keyboard on PC, swipe on phones.
+  const onKey = e => {
+    if (!document.body.contains(box)) return document.removeEventListener('keydown', onKey);
+    if (e.target.matches('input, textarea') || document.querySelector('.sheet-bg')) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); show(cur + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(cur - 1); }
+  };
+  document.addEventListener('keydown', onKey);
+  let tx = null, ty = 0;
+  stage.addEventListener('touchstart', e => { if (e.target.closest('input, textarea, button')) return tx = null; tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if (tx == null) return; const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) show(cur + (dx < 0 ? 1 : -1));
+  });
+  let rt, lastW = innerWidth, lastH = innerHeight;
+  const onResize = () => {
+    if (!document.body.contains(box)) return window.removeEventListener('resize', onResize);
+    // Ignore the phone keyboard opening (height-only change while typing).
+    if (innerWidth === lastW && (document.activeElement?.matches('input, textarea') || Math.abs(innerHeight - lastH) < 80)) return;
+    lastW = innerWidth; lastH = innerHeight; clearTimeout(rt); rt = setTimeout(paginate, 200);
+  };
+  window.addEventListener('resize', onResize);
   box.onclick = e => {
     const b = e.target.closest('.mv-btn'); if (!b) return;
-    const sec = b.closest('.mv-slide');
+    const sec = b.closest('.mv-page');
     if (b.dataset.act === 'ans') {
       const a = sec.querySelector(`#mv-${CSS.escape(b.dataset.id)}`) || b.closest('.mv-box')?.querySelector('.mv-ans');
       if (a) { a.hidden = !a.hidden; b.textContent = a.hidden ? '답 보기' : '답 숨기기'; }
     } else if (b.dataset.act === 'all') {
-      const as = [...sec.querySelectorAll('.mv-ans')], show = as.some(a => a.hidden);
-      as.forEach(a => a.hidden = !show); sec.querySelectorAll('.mv-btn[data-act="ans"]').forEach(x => x.textContent = show ? '답 숨기기' : '답 보기');
-      b.textContent = show ? '모범 답안 모두 숨기기' : '모범 답안 모두 보기';
+      const as = [...sec.querySelectorAll('.mv-ans')], open = as.some(a => a.hidden);
+      as.forEach(a => a.hidden = !open); sec.querySelectorAll('.mv-btn[data-act="ans"]').forEach(x => x.textContent = open ? '답 숨기기' : '답 보기');
+      b.textContent = open ? '모범 답안 모두 숨기기' : '모범 답안 모두 보기';
     } else if (b.dataset.act === 'check' || b.dataset.act === 'reset') {
       const ins = [...sec.querySelectorAll('.mv-in[data-answer]')]; let ok = 0;
       ins.forEach(i => {
@@ -946,14 +1041,30 @@ function memoView(m, box) {
         if (b.dataset.act === 'reset') { i.value = ''; return; }
         const good = i.dataset.answer.split(',').map(norm).includes(norm(i.value));
         if (good) ok++; i.classList.add(good ? 'ok' : 'no');
-        if (!good && i.value.trim()) i.title = '정답: ' + i.dataset.answer.split(',')[0];
       });
-      let fb = sec.querySelector('.mv-score'); if (!fb) { fb = document.createElement('p'); fb.className = 'mv-score'; b.closest('.mv-row, .mv-body').after(fb); }
-      fb.textContent = b.dataset.act === 'reset' ? '' : `${ins.length}문제 중 ${ok}개 맞았어요${ok < ins.length ? ' · 빨간 칸을 다시 채워 보세요' : ' 👏'}`;
-      if (b.dataset.act === 'check') sec.querySelectorAll('.mv-in.no').forEach(i => { i.placeholder = i.dataset.answer.split(',')[0].replace(/./g, (c, k) => k ? '·' : c); });
+      if (b.dataset.act === 'check') sec.querySelectorAll('.mv-in.no').forEach(i => { i.placeholder = i.dataset.answer.split(',')[0].replace(/\S/g, (c, k) => k ? '·' : c); });
+      toast(b.dataset.act === 'reset' ? '빈칸을 비웠어요' : `${ins.length}문제 중 ${ok}개 맞았어요${ok < ins.length ? ' · 빨간 칸을 다시 채워 보세요' : ' 👏'}`);
     }
   };
-  box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('.mv-in')) { e.preventDefault(); e.target.closest('.mv-slide').querySelector('.mv-btn[data-act="check"]')?.click(); } });
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('.mv-in')) { e.preventDefault(); e.target.closest('.mv-page').querySelector('.mv-btn[data-act="check"]')?.click(); } });
+  requestAnimationFrame(paginate);
+}
+// Splits a slide body into blocks that can move to the next page on their own.
+function mvUnits(body) {
+  const out = [];
+  const walk = (el, wrap) => {
+    for (const c of [...el.children]) {
+      if (c.matches('.mv-row') && c.querySelector('.mv-btn[data-act="check"], .mv-btn[data-act="all"], .mv-btn[data-act="reset"]') && !c.querySelector('.mv-box, .mv-in')) { out.push({ node: c, ctrl: true }); continue; }
+      if (c.matches('.mv-grid')) { const key = 'g' + out.length; for (const k of [...c.children]) out.push({ node: k, wrap: { cls: 'mv-grid', cols: c.dataset.cols, key } }); continue; }
+      if (c.matches('.mv-flat')) { walk(c, wrap); continue; }
+      if (c.matches('.mv-box') && c.children.length > 2 && c.querySelector(':scope > .mv-box, :scope > .mv-grid')) { walk(c, wrap); continue; }
+      if (c.matches('.mv-quote') && c.children.length > 1) { const key = 'q' + out.length; for (const k of [...c.children]) out.push({ node: k, wrap: { cls: 'mv-quote', key } }); continue; }
+      if (c.matches('div:not([class]), div[class=""]') && c.children.length) { walk(c, wrap); continue; }
+      out.push({ node: c, wrap });
+    }
+  };
+  walk(body, null);
+  return out;
 }
 // Memos that are apps, not slide decks: same sections, built from the lesson data.
 function mvFromData(m) {
@@ -982,11 +1093,11 @@ function lesson(id, tab) {
   if (tab === 'sent') body = m.sentences.map(x => `<div class="expr"><div class="ex" style="border:0;padding:0">${sayBtn(x.en)}<span>${markHl(x.en, x.hl)}</span></div>${x.ko ? `<p class="note">${esc(x.ko)}</p>` : ''}</div>`).join('');
   if (tab === 'prod') body = `<button class="btn" id="go">이 수업 영작 문제 풀기</button>` + revealList(m.production);
   app.innerHTML = `${bar('home')}
-  <div class="stack" style="gap:16px">
-    <div class="stack" style="gap:6px">
+  <div class="stack ${tab === 'memo' ? 'memo-mode' : ''}" style="gap:${tab === 'memo' ? 10 : 16}px">
+    ${tab === 'memo' ? '' : `<div class="stack" style="gap:6px">
       <span class="label">${m.date.replace(/-/g, '.')} 수업</span>
       <h1 style="font-size:1.6rem">${esc(m.topic)}</h1>
-    </div>
+    </div>`}
     ${hasMemo ? `<div class="modeswitch" role="tablist"><button role="tab" aria-selected="${tab === 'memo'}" data-tab="memo">📄 수업 복습</button><button role="tab" aria-selected="${tab !== 'memo'}" data-tab="${practiceTab}">🗣️ 반복 말하기</button></div>` : ''}
     ${tab === 'memo' ? '' : `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}</button>`).join('')}</div>`}
     <div class="stack ${tab === 'speak' || tab === 'prod' || tab === 'memo' ? '' : 'cols'}" style="gap:10px">${body}</div>
