@@ -371,12 +371,15 @@ body:has(.memo-mode) .wrap { padding-bottom: calc(12px + env(safe-area-inset-bot
 .mv-ex { color: var(--sub); font-size: .95rem }
 .mv-ko { color: var(--accent); font-weight: 600; font-size: .9rem }
 .mv-grid { display: grid; gap: 10px; min-width: 0 }
-.mv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between }
+.mv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; min-width: 0 }
+.mv-row > * { min-width: 0; max-width: 100% }
+.mv-page, .mv-body, .mv-box, .mv-flat { grid-template-columns: minmax(0, 1fr) }
+.mv-body p, .mv-ex { overflow-wrap: anywhere; min-width: 0 }
 .mv-btn { border: 0; background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: 10px; padding: 8px 12px; font-size: .88rem; cursor: pointer; flex: 0 0 auto }
 .mv-btn.main { background: var(--accent); color: #fff }
 .mv-ans { background: var(--surface); border-radius: 12px; padding: 10px 12px; color: var(--accent); font-weight: 700 }
 .mv-ans[hidden] { display: none }
-.mv-in { width: auto; max-width: min(calc(100% - 8px), 15em); font: inherit; font-weight: 600; border: 0; border-bottom: 2px solid var(--accent); background: var(--surface); border-radius: 8px 8px 0 0; padding: 2px 8px; margin: 2px 4px; color: var(--ink);  }
+.mv-in { width: auto; max-width: min(calc(100% - 8px), 15em); box-sizing: border-box; min-width: 0; font: inherit; font-weight: 600; border: 0; border-bottom: 2px solid var(--accent); background: var(--surface); border-radius: 8px 8px 0 0; padding: 2px 8px; margin: 2px 4px; color: var(--ink);  }
 .mv-flat > p .mv-in, .mv-body > p .mv-in { background: var(--fill) }
 .mv-in:focus { outline: 2px solid var(--accent-soft) }
 .mv-in.ok { border-color: #12b76a; color: #0b8a5a }
