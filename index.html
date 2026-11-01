@@ -124,6 +124,11 @@ mark { background: linear-gradient(transparent 55%, var(--mark) 55%); color: inh
 /* Lesson */
 .passage { display: grid; gap: 10px; font-size: 1.12rem; line-height: 1.65 }
 .passage .s { display: block }
+.partbtn { display: flex; gap: 10px; align-items: center; justify-content: space-between; width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 10px 14px; font: inherit; color: var(--ink); text-align: left }
+.partbtn .muted { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .88rem }
+.passage .s-ko { display: block; font-size: .9rem; color: var(--sub); line-height: 1.5; margin-top: 2px }
+.passage .s-ex { display: block; font-size: .85rem; color: var(--accent); line-height: 1.5; margin-top: 2px }
+.passage .s-ex b { font-weight: 700 }
 .passage .s.gap { border: 1.5px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: var(--accent-soft); font-size: 1rem }
 .passage .s.gap .ko { color: var(--ink); font-weight: 600 }
 .passage .s.gap .hint { color: var(--accent); font-family: var(--mono); font-size: .92rem; letter-spacing: .02em }
@@ -344,6 +349,9 @@ body:has(.memo-mode) .wrap { padding-bottom: calc(12px + env(safe-area-inset-bot
 .mv-body p { margin: 0 }
 .mv-flat, .mv-box { display: grid; gap: 8px; min-width: 0 }
 .mv-box { background: var(--fill); border-radius: 14px; padding: 12px 14px }
+.mv-pair { display: grid; gap: 8px }
+.mv-ko-line { color: var(--sub); font-size: .95rem; line-height: 1.6; padding: 0 4px }
+.mv-ko-line p { margin: 0 }
 .mv-box .mv-box { background: var(--surface); padding: 10px 12px; border-radius: 12px }
 .mv-quote { background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; display: grid; gap: 8px; font-size: 1rem; line-height: 1.7 }
 .mv-body mark { background: none; color: var(--accent); font-weight: 700; padding: 0 }
@@ -969,7 +977,9 @@ function memoView(m, box) {
     const body = document.createElement('div');
     if (typeof p.body === 'string') body.innerHTML = p.body; else body.append(p.body);
     mvWrapInline(body);
-    return { ...p, kind: mvKind(p.label, p.title), units: mvUnits(body) };
+    const kind = mvKind(p.label, p.title);
+    if (kind === 'daily' || kind === 'work') mvPair(body);
+    return { ...p, kind, units: mvUnits(body) };
   });
   box.innerHTML = `<div class="mv-stage"></div>
     <div class="mv-nav"><button class="mv-prev" aria-label="이전">‹ 이전</button><button class="mv-pos"></button><button class="mv-next" aria-label="다음">다음 ›</button></div>`;
@@ -1089,6 +1099,41 @@ function memoView(m, box) {
   requestAnimationFrame(paginate);
 }
 // Splits a slide body into blocks that can move to the next page on their own.
+// Story slides: English, then its Korean, then the expression cards used in it, kept together as one block
+// so a page break never separates a sentence from its meaning (Ryan 2026-11-01).
+const hangulShare = t => { const h = (t.match(/[가-힣]/g) || []).length, l = (t.match(/[A-Za-z]/g) || []).length; return h / Math.max(1, h + l); };
+function mvPair(body) {
+  const quote = body.querySelector('.mv-quote'); if (!quote) return;
+  const boxes = [...body.querySelectorAll('.mv-box')].filter(b => !b.contains(quote) && !b.parentElement.closest('.mv-box'));
+  const koBox = boxes.find(b => hangulShare(b.textContent) > .8);
+  const cards = boxes.filter(b => b !== koBox && hangulShare(b.textContent) <= .8);
+  const paras = el => { const ps = [...el.querySelectorAll(':scope > p, :scope > div')].filter(x => x.textContent.trim()); return ps.length ? ps : [el]; };
+  const en = paras(quote);
+  let ko = koBox ? paras(koBox) : [];
+  if (koBox && ko.length !== en.length) { // one Korean block for several English lines: cut it at line breaks or quoted lines
+    const t = koBox.innerText || koBox.textContent;
+    let bits = t.split(/\n+/).map(x => x.trim()).filter(Boolean);
+    if (bits.length !== en.length) bits = (t.match(/["“][^"”]+["”]/g) || []).map(x => x.trim());
+    if (bits.length === en.length) ko = bits.map(x => { const p = document.createElement('p'); p.textContent = x; return p; });
+  }
+  const groups = en.length === ko.length ? en.map((e, i) => ({ en: [e], ko: [ko[i]] })) : [{ en, ko }];
+  const head = c => (c.querySelector('.mv-h') || c).textContent;
+  const used = new Set();
+  for (const g of groups) {
+    const txt = g.en.map(e => e.textContent).join(' '), tw = new Set(hlWords(txt));
+    g.cards = cards.filter(c => { if (used.has(c)) return false; const cw = hlWords(head(c)); const ok = cw.length && cw.filter(w => tw.has(w)).length / cw.length >= .5; if (ok) used.add(c); return ok; });
+  }
+  groups[groups.length - 1].cards.push(...cards.filter(c => !used.has(c)));
+  const frag = document.createDocumentFragment();
+  for (const g of groups) {
+    const box = document.createElement('div'); box.className = 'mv-pair';
+    const q = document.createElement('div'); q.className = 'mv-quote'; q.append(...g.en); box.append(q);
+    if (g.ko.length) { const k = document.createElement('div'); k.className = 'mv-ko-line'; g.ko.forEach(x => k.append(...(x === koBox ? [...x.childNodes] : [x]))); box.append(k); }
+    frag.append(box, ...g.cards); // cards follow the lines they explain; a page break may fall between cards, never inside a pair
+  }
+  quote.replaceWith(frag);
+  koBox?.remove();
+}
 function mvUnits(body) {
   const out = [];
   const walk = (el, wrap) => {
@@ -1129,7 +1174,7 @@ function lesson(id, tab) {
   if (tab === 'memo') body = `<div class="mv"><p class="muted" id="memoload" style="padding:24px 4px">수업 메모를 불러오는 중…</p></div>`;
   if (tab === 'expr') body = m.expressions.map(exprHTML).join('');
   if (tab === 'fill') body = `<button class="btn" id="go">이 수업 빈칸 문제 풀기</button>` + m.fill.map(q => `<div class="expr"><p>${esc(q.before)} <mark>${esc(q.answers[0])}</mark>${/^[.,?!]/.test(q.after) ? '' : ' '}${esc(q.after)}</p><p class="note">${esc(q.ko)}</p></div>`).join('');
-  if (tab === 'sent') body = m.sentences.map(x => `<div class="expr"><div class="ex" style="border:0;padding:0">${sayBtn(x.en)}<span>${markHl(x.en, x.hl)}</span></div>${x.ko ? `<p class="note">${esc(x.ko)}</p>` : ''}</div>`).join('');
+  if (tab === 'sent') body = m.sentences.map(x => `<div class="expr"><div class="ex" style="border:0;padding:0">${sayBtn(x.en)}<span>${markHl(x.en, x.hl)}</span></div>${x.ko ? `<p class="note">${esc(x.ko)}</p>` : ''}<div class="passage" style="font-size:1rem">${exprNotes(m, x.hl)}</div></div>`).join('');
   if (tab === 'prod') body = `<button class="btn" id="go">이 수업 영작 문제 풀기</button>` + revealList(m.production);
   app.innerHTML = `${bar('home')}
   <div class="stack ${tab === 'memo' ? 'memo-mode' : ''}" style="gap:${tab === 'memo' ? 10 : 16}px">
@@ -1141,7 +1186,11 @@ function lesson(id, tab) {
     ${tab === 'memo' ? '' : `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}</button>`).join('')}</div>`}
     <div class="stack ${tab === 'speak' || tab === 'prod' || tab === 'memo' ? '' : 'cols'}" id="lbody" style="gap:10px">${body}</div>
   </div>`;
-  app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => lesson(id, b.dataset.tab));
+  app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+    const r = state[speakKey(id)];
+    if (b.closest('.modeswitch') && b.dataset.tab === 'speak' && r && !r.done) return speak(id); // resume where the student stopped
+    lesson(id, b.dataset.tab);
+  });
   if (['expr', 'sent', 'fill'].includes(tab)) pager(document.getElementById('lbody'));
   if (tab === 'prod') bindReveal();
   if (tab === 'memo') {
@@ -1234,18 +1283,18 @@ function speak(id, part, step) {
   blank = new Set(blank);
   let open = false, hints = false, showKo = false;
   const draw = () => {
-    app.innerHTML = `${bar('home')}
+    app.innerHTML = `${bar('lesson:' + id)}
     <div class="stack" style="gap:14px">
       <div class="row" style="justify-content:space-between;gap:8px"><span class="label">내 이야기 말하기${parts.length > 1 ? ` · ${part + 1} / ${parts.length}부분` : ''}</span><span class="pill">${fmtDate(m.date)} 수업</span></div>
       <div class="ladder" title="단계">${steps.map((_, k) => `<i class="${k < step ? 'on' : k === step ? 'now' : ''}" ${me.viewOnly ? `data-jump="${k}" style="cursor:pointer;height:10px"` : ''}></i>`).join('')}</div>
-      ${me.viewOnly && parts.length > 1 ? `<div class="row" style="gap:6px;flex-wrap:wrap">${parts.map((_, k) => `<button class="chip ${k === part ? 'hot' : ''}" data-part="${k}">${k + 1}부분</button>`).join('')}</div>` : ''}
+      ${parts.length > 1 ? `<button class="partbtn" id="partsel"><span><b>${part + 1}부분</b> / ${parts.length}</span><span class="muted">${esc(P.units[0].en.slice(0, 28))}…</span><span>▾</span></button>` : ''}
       <div class="card">
         <div class="row" style="justify-content:space-between;gap:8px"><b>${step + 1}단계 · ${stepName(st)}</b>${st.mode === 'full' ? sayBtn(P.units.map(u => u.en).join(' ')) : ''}</div>
         <p class="muted" style="margin:0;font-size:.92rem">${st.mode === 'full' ? '소리 내서 전체를 읽어 보세요.' : '빈칸 부분을 영어로 소리 내서 말해 본 다음 정답을 확인하세요.'}</p>
-        <div class="passage">${P.units.map((u, k) => st.mode === 'one' && k !== st.i ? '' : !blank.has(k) ? `<span class="s">${markHl(u.en, u.hl)}</span>`
+        <div class="passage">${P.units.map((u, k) => st.mode === 'one' && k !== st.i ? '' : !blank.has(k) ? `<span class="s">${markHl(u.en, u.hl)}${u.ko ? `<span class="s-ko">${esc(u.ko)}</span>` : ''}${exprNotes(m, u.hl)}</span>`
           : `<span class="s gap ${open ? 'open' : ''}">${u.ko ? `<span class="ko">${esc(u.ko)}</span>` : `<span class="muted">${k + 1}번째 문장</span>`}
              ${hints && !open ? `<span class="hint" style="display:block;margin-top:4px">${esc(firstLetters(u.en))}</span>` : ''}
-             ${open ? `<span class="en">${sayBtn(u.en)}${markHl(u.en, u.hl)}</span>` : ''}</span>`).join('')}</div>
+             ${open ? `<span class="en">${sayBtn(u.en)}${markHl(u.en, u.hl)}</span>${exprNotes(m, u.hl)}` : ''}</span>`).join('')}</div>
         ${P.ko && blank.size && P.units.some((u, k) => blank.has(k) && !u.ko) ? `<button class="ghost" id="ko" style="justify-self:start">${showKo ? '우리말 숨기기' : '우리말 전체 보기'}</button>${showKo ? `<p class="note">${esc(P.ko)}</p>` : ''}` : ''}
       </div>
       ${st.mode === 'full' ? `<button class="btn" id="next">다 읽었어요 · 다음 단계</button>`
@@ -1254,7 +1303,7 @@ function speak(id, part, step) {
       <div class="stepnav"><button id="prevstep" ${part === 0 && step === 0 ? 'disabled' : ''}>‹ 이전</button><button id="nextstep" ${part === parts.length - 1 && step === steps.length - 1 ? 'disabled' : ''}>다음 ›</button></div>
     </div>`;
     const on = (id, f) => { const b = document.getElementById(id); if (b) b.onclick = f; };
-    const go = (np, ns) => { if (!me.viewOnly) { state[speakKey(id)] = { part: np, step: ns, t: Date.now() }; saveSoon(); } speak(id, np, ns); };
+    const go = (np, ns) => { state[speakKey(id)] = { part: np, step: ns, t: Date.now() }; saveSoon(); speak(id, np, ns); };
     on('prevstep', () => step > 0 ? go(part, step - 1) : go(part - 1, ladder(parts[part - 1].units.length).length - 1));
     on('nextstep', () => step + 1 < steps.length ? go(part, step + 1) : go(part + 1, 0));
     on('reveal', () => { open = true; draw(); say(P.units.filter((_, k) => blank.has(k)).map(u => u.en).join(' ')); });
@@ -1262,7 +1311,7 @@ function speak(id, part, step) {
     on('ko', () => { showKo = !showKo; draw(); });
     on('again', () => speak(id, part, step));
     app.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => speak(id, part, +b.dataset.jump));
-    app.querySelectorAll('[data-part]').forEach(b => b.onclick = () => speak(id, +b.dataset.part, 1));
+    const ps = document.getElementById('partsel'); if (ps) ps.onclick = () => partSheet(m, parts, part, k => go(k, 0));
     on('next', () => {
       const d = state._days = state._days || {}; d[today()] = (d[today()] || 0) + 1;
       let np = part, ns = step + 1;
@@ -1272,8 +1321,30 @@ function speak(id, part, step) {
       np >= parts.length ? speakDone(m) : speak(id, np, ns);
     });
   };
-  if (!me.viewOnly && state[speakKey(id)]?.done !== true) { state[speakKey(id)] = { part, step, t: Date.now() }; saveSoon(); }
+  if (state[speakKey(id)]?.done !== true) { state[speakKey(id)] = { part, step, t: Date.now() }; saveSoon(); }
   draw();
+}
+// The lesson's expression card for a highlighted phrase ("got out an hour early" → "get out early"), by shared content words.
+const HL_STOP = new Set(['be', 'is', 'am', 'are', 'was', 'were', 'to', 'a', 'an', 'the', 'one', "one's", 'someone', 'something', 'sb', 'sth', 'of', 'in', 'on', 'at', 'for', 'it', 'up']);
+const hlWords = t => t.toLowerCase().replace(/\(.*?\)/g, ' ').match(/[a-z']+/g)?.filter(w => !HL_STOP.has(w)).map(w => w.replace(/(ing|ed|es|s)$/, '')) || [];
+function exprFor(m, h) {
+  const hw = new Set(hlWords(h)); let best = null, score = 0;
+  for (const x of m.expressions || []) { const xw = hlWords(x.expr); const c = xw.filter(w => hw.has(w)).length / Math.max(1, xw.length); if (c > score) { score = c; best = x; } }
+  return score >= .5 ? best : null;
+}
+function exprNotes(m, hl) {
+  const xs = [...new Set((hl || []).map(h => exprFor(m, h)).filter(x => x && x.meaning))];
+  return xs.map(x => `<span class="s-ex"><b>${esc(x.expr)}</b> · ${esc(x.meaning)}</span>`).join('');
+}
+// Part list as a sheet: scroll up/down and tap a part. Done parts get ✓, the one in progress is marked.
+function partSheet(m, parts, cur, pick) {
+  const r = state[speakKey(m.id)] || {};
+  const bg = document.createElement('div'); bg.className = 'sheet-bg';
+  bg.innerHTML = `<div class="sheet"><h2 style="margin:0;font-size:1.15rem">부분 고르기</h2><p class="muted" style="margin:0;font-size:.85rem">위아래로 밀어서 고르세요</p>
+    <div class="group" style="max-height:60vh;overflow-y:auto">${parts.map((p, k) => `<button class="lesson" data-pk="${k}" style="${k === cur ? 'background:var(--accent-soft)' : ''}"><span class="date">${k + 1}<small>부분</small></span><span class="t"><h3 style="font-size:.95rem">${esc(p.units[0].en)}</h3><p>${r.done || k < (r.part || 0) ? '✓ 연습했어요' : k === (r.part || 0) ? '여기까지 했어요' : `문장 ${p.units.length}개`}</p></span></button>`).join('')}</div></div>`;
+  document.body.appendChild(bg);
+  bg.querySelector(`[data-pk="${cur}"]`)?.scrollIntoView({ block: 'center' });
+  bg.onclick = e => { const b = e.target.closest('[data-pk]'); if (b) { bg.remove(); pick(+b.dataset.pk); } else if (e.target === bg) bg.remove(); };
 }
 function speakDone(m) {
   app.innerHTML = `${bar('home')}<div class="done"><span class="big">🗣️</span><h2>혼자서 끝까지 말했어요!</h2><p class="muted">${esc(m.topic)}<br>며칠 뒤에 '전부 비우기'만 다시 해 보면 오래 기억에 남아요.</p>
@@ -1551,6 +1622,20 @@ function prodHint(en) {
   for (let k = words.length - 1; k > 0; k--) { const j = Math.random() * (k + 1) | 0; [words[k], words[j]] = [words[j], words[k]]; }
   return `<b>때:</b> ${esc(tense)}<br><b>써야 할 단어:</b> ${words.slice(0, 6).map(esc).join(' · ')}<br><span class="muted">단어 ${t.split(/\s+/).filter(Boolean).length}개 정도</span>`;
 }
+// 영작 check: the student's words against the model answer, word by word (common words kept in order = LCS).
+function compareAns(mine, model) {
+  // contractions are opened on both sides so "That is" and "That's" count as the same
+  const W = t => t.replace(/[’‘`]/g, "'").replace(/\b(can)'t\b/gi, '$1 not').replace(/\bwon't\b/gi, 'will not').replace(/n't\b/gi, ' not').replace(/'m\b/gi, ' am').replace(/'re\b/gi, ' are').replace(/'ve\b/gi, ' have').replace(/'ll\b/gi, ' will').replace(/'d\b/gi, ' would').replace(/\b(it|that|he|she|there|here|what|who|where)'s\b/gi, '$1 is').split(/\s+/).filter(Boolean), key = w => norm(w);
+  const a = W(mine), b = W(model), n = a.length, k = b.length;
+  const L = Array.from({ length: n + 1 }, () => Array(k + 1).fill(0));
+  for (let x = n - 1; x >= 0; x--) for (let y = k - 1; y >= 0; y--) L[x][y] = key(a[x]) === key(b[y]) ? L[x + 1][y + 1] + 1 : Math.max(L[x + 1][y], L[x][y + 1]);
+  const okA = new Set(), okB = new Set(); let x = 0, y = 0;
+  while (x < n && y < k) { if (key(a[x]) === key(b[y])) { okA.add(x++); okB.add(y++); } else if (L[x + 1][y] >= L[x][y + 1]) x++; else y++; }
+  if (okA.size === n && okB.size === k) return `<div class="feedback ok">정답이에요! 모범 답안과 똑같아요.</div>`;
+  const mineH = a.map((w, j) => okA.has(j) ? esc(w) : `<s style="color:var(--bad)">${esc(w)}</s>`).join(' ');
+  const miss = b.filter((_, j) => !okB.has(j));
+  return `<div class="feedback no"><span class="label">내 답</span><div style="margin-top:4px;color:var(--ink)">${mineH}</div>${miss.length ? `<div style="margin-top:6px">빠진 말: <b>${esc(miss.join(' · '))}</b></div>` : ''}<div class="muted" style="margin-top:4px;font-size:.85rem">줄 그은 말은 모범 답안에 없는 말이에요. 뜻이 같으면 맞은 거예요.</div></div>`;
+}
 function quiz(list, back, start = 0, right0 = 0) {
   let i = start, right = right0;
   const deadline = QUIZ_DEADLINE; QUIZ_DEADLINE = 0; // set only by 10분 연습
@@ -1574,15 +1659,16 @@ function quiz(list, back, start = 0, right0 = 0) {
         <p class="sentence gline">${segs.map((t, k) => esc(t) + (k < segs.length - 1 ? `<input class="gin" data-k="${k}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="빈칸 ${k + 1}" style="width:${Math.max(4, Math.min(16, Math.max(...q.alts.map(a => (a[k] || '').length)) + 2))}ch">` : '')).join('')}</p>
         ${hintBox(esc([q.hint, q.ko].filter(Boolean).join(' · ')))}
         <div id="fb"></div>
-        <button class="btn" id="sub">확인</button>
+        <div class="row" style="gap:8px;flex-wrap:nowrap"><button type="button" class="btn secondary" id="peek" style="flex:1;white-space:nowrap">정답 보기</button><button class="btn" id="sub" style="flex:2">확인</button></div>
       </form></div>`;
       addNav(i, list.length, k => { i = k; show(); }); bindHint();
       const ins = [...app.querySelectorAll('.gin')]; ins[0]?.focus();
       let checked = false;
+      document.getElementById('peek').onclick = () => { ins.forEach(x => { x.value = ''; }); document.getElementById('qf').requestSubmit(); };
       document.getElementById('qf').onsubmit = e => {
         e.preventDefault();
         if (checked) { i++; return show(); }
-        checked = true;
+        checked = true; document.getElementById('peek')?.remove();
         const vals = ins.map(x => x.value);
         const ok = q.alts.some(a => a.length === vals.length && a.every((ans, k) => gNorm(ans) === gNorm(vals[k])));
         ins.forEach(x => { x.classList.add(ok ? 'ok' : 'no'); x.readOnly = true; });
@@ -1643,11 +1729,12 @@ function quiz(list, back, start = 0, right0 = 0) {
         <textarea class="answer-in" id="ans" rows="2" placeholder="내 답 (안 써도 돼요. 소리 내서 말해 봐도 좋아요)"></textarea>
         ${hintBox(prodHint(q.en))}
         <div id="model"></div>
-        <button class="btn" id="reveal">모범 답안 보기</button>
+        <button class="btn" id="reveal">답 확인하기</button>
       </div></div>`;
       addNav(i, list.length, k => { i = k; show(); }); bindHint();
       document.getElementById('reveal').onclick = () => {
-        document.getElementById('model').innerHTML = `<div class="answer"><span class="label">모범 답안</span><div class="ex" style="border:0;padding:0">${sayBtn(q.en)}<b>${esc(q.en)}</b></div></div>`;
+        const mine = document.getElementById('ans').value.trim();
+        document.getElementById('model').innerHTML = (mine ? compareAns(mine, q.en) : '') + `<div class="answer"><span class="label">모범 답안</span><div class="ex" style="border:0;padding:0">${sayBtn(q.en)}<b>${esc(q.en)}</b></div></div>`;
         say(q.en);
         const r = document.getElementById('reveal');
         r.outerHTML = `<div class="grades"><button class="grade again" data-g="0">못 했어요</button><button class="grade" data-g="1">비슷했어요</button><button class="grade good" data-g="2">거의 맞았어요</button></div>`;
