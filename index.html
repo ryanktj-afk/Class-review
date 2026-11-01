@@ -1165,17 +1165,81 @@ function exprCard(x) {
 // Finding the explanation for a blue expression (Ryan 2026-11-01: every blue expression must open one).
 // Looks in this slide's cards, then the memo's other cards (핵심 표현 slides), then the lesson's expression list,
 // then every lesson's expressions (strict match only).
-const sameWord = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a))); // wrapp(ed) ~ wrap
+// Same word, allowing only word endings: wrapp(ed) ~ wrap, complie(s) ~ comply. Not off ~ offend, out ~ outrank, her ~ here (Ryan 2026-11-01).
+const sameWord = (a, b) => {
+  if (a === b) return true;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  if (s.length < 3) return false;
+  const st = s.replace(/y$/, 'i');
+  const rest = l.startsWith(s) ? l.slice(s.length) : l.startsWith(st) ? l.slice(st.length) : null;
+  return rest != null && (/^(s|es|e|d|ed|r|er|ing)$/.test(rest) || (rest === 'ly' && s.length >= 5) || rest === s.slice(-1)); // personally ~ personal, but not really ~ real
+};
+// Small words (particles, pronouns) never make a match on their own: 'caught up with' is not the 'WITH' card.
+const HL_WEAK = new Set(['be', 'with', 'from', 'into', 'about', 'out', 'off', 'over', 'by', 'as', 'so', 'and', 'or', 'that', 'this', 'what', 'who', 'here', 'there', 'me', 'you', 'him', 'her', 'it', 'them', 'us', 'my', 'your', 'his', 'their', 'our', 'i', 'he', 'she', 'we', 'they', 'not', 'no', 'do', 'did', 'have', 'had', 'get', 'got', 'go', 'make', 'take', 'like', 'just', 'than', 'too', 'very', 'all', 'some', 'any', 'only', 'back', 'down', 'away', 'around', 'through', 'after', 'before', 'without', 'thing'].map(w => w.replace(/(ing|ed|es|s)$/, ''))); // same endings cut as hlWords
 const cardHead = c => (c.querySelector('.mv-h, h3, b, strong') || c).textContent;
-function bestMatch(txt, items, wordsOf, strict) {
-  const tw = hlWords(txt); if (!tw.length) return null;
-  let best = null, score = 0;
+// Words for matching: like hlWords, but took → take, psychiatrist's → psychiatrist (Ryan 2026-11-01).
+let IRR_BASE = null;
+const baseOf = w => { if (!IRR_BASE) { IRR_BASE = { shown: 'show', drew: 'draw', drawn: 'draw', knew: 'know', known: 'know', taught: 'teach', spoke: 'speak', flew: 'fly', forgot: 'forget', meant: 'mean', heard: 'hear', built: 'build', led: 'lead' };
+  for (const [k, v] of Object.entries(IRREG)) for (const f of v.split('|')) if (!IRR_BASE[f]) IRR_BASE[f] = k; } return IRR_BASE[w] || w; };
+const mWords = t => (String(t).toLowerCase().replace(/\(.*?\)/g, ' ').replace(/’/g, "'").match(/[a-z0-9']+/g) || [])
+  .filter(w => !HL_STOP.has(w)).map(w => w.replace(/'s?$/, '')).filter(w => w && !HL_STOP.has(w))
+  .map(w => { const b0 = baseOf(w); return b0 !== w ? b0 : w.replace(/(ing|ed|es|s)$/, ''); }).filter(Boolean);
+// When only small words are shared, the whole phrase must be there, in order: 'had to serve' → had to, 'took over' → take over,
+// but not 'had ramen' → had to or 'make breakfast' → make up for.
+const PH_SKIP = /^(someone|somebody|something|sb|sth|one's|someone's|ing)$/;
+function phraseIn(cardTxt, txt) {
+  const toks = t => (String(t).toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').match(/[a-z0-9']+/g) || []).map(w => baseOf(w));
+  const mt = toks(txt);
+  const same = (m, c) => m === c || sameWord(m.replace(/(ing|ed|es|s)$/, ''), c.replace(/(ing|ed|es|s)$/, '')) || (c === 'be' && /^(am|is|are|was|were|been|being|i'm|you're|he's|she's|it's|we're|they're)$/.test(m));
+  for (const alt of String(cardTxt).replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/[가-힣][^/·,;]*/g, ' ').split(/\s*[\/·,;]\s*|\s+vs\.?\s+/i)) {
+    let ct = toks(alt).filter(w => !PH_SKIP.test(w));
+    if (ct.length < 2) continue;
+    if (ct.length === 2 && ct[0] === 'be' && !mt.some(w => same(w, 'be'))) ct = ct.slice(1); // be into ~ → so into it
+    if (ct.length > 1 && sub(mt, ct)) return true;
+    if (mt.length >= 2 && mt.length <= ct.length && sub(ct, mt)) return true; // the blue words sit inside the card's phrase: go over → go over the numbers
+  }
+  return false;
+  function sub(mt, ct) {
+    for (let i = 0; i < mt.length; i++) {
+      if (!same(mt[i], ct[0])) continue;
+      let at = i, ok = true;
+      for (let k = 1; k < ct.length && ok; k++) { let f = -1; for (let j = at + 1; j <= at + 2 && j < mt.length; j++) if (same(mt[j], ct[k])) { f = j; break; } if (f < 0) ok = false; else at = f; }
+      if (ok) return true;
+    }
+    return false;
+  }
+}
+// A verb + particle card never matches the same verb with another particle: stepped out ≠ step in, catch up on ≠ catch on.
+const PARTS = /^(in|on|up|out|off|over|into|at|to|for|with|from|back|down|away|around|through|by|about|along|as)$/;
+function particleClash(cardTxt, txt) {
+  const toks = t => (String(t).toLowerCase().replace(/[가-힣].*$/, '').match(/[a-z']+/g) || []).map(w => baseOf(w));
+  const mt = toks(txt);
+  return String(cardTxt).replace(/\(.*?\)/g, ' ').split(/\s*[\/·,;]\s*/).every(alt => {
+    const ct = toks(alt).filter(w => !PH_SKIP.test(w)); if (ct.length < 2 || !PARTS.test(ct[1])) return false;
+    const i = mt.findIndex(w => w === ct[0] || sameWord(w.replace(/(ing|ed|es|s)$/, ''), ct[0].replace(/(ing|ed|es|s)$/, '')));
+    if (i < 0) return false;
+    const nx = PARTS.test(mt[i + 1] || '') ? mt[i + 1] : !PARTS.test(mt[i + 1] || 'x') && PARTS.test(mt[i + 2] || '') && mt[i + 2] !== 'to' ? mt[i + 2] : null; // dropped my kids off
+    return nx != null && nx !== ct[1];
+  });
+}
+function bestMatch(txt, items, textOf, strict) {
+  const tw = mWords(txt); if (!tw.length) return null;
+  let best = null, score = 0, bestHit = 0;
   for (const it of items) {
-    const cw = wordsOf(it); if (!cw.length) continue;
-    const hit = cw.filter(w => tw.some(x => sameWord(x, w))).length;
-    const a = hit / cw.length, b = hit / tw.length;
+    const ct = textOf(it), cw = mWords(ct); if (!cw.length) continue;
+    const hits = cw.filter(w => tw.some(x => sameWord(x, w))), hit = hits.length;
+    if (hit && hits.every(w => HL_WEAK.has(w)) && (strict || !phraseIn(ct, txt))) continue; // only small words in common
+    if (hit && particleClash(ct, txt)) continue;
+    if (/\bused to\b/i.test(ct) && /\bused to\b/i.test(txt)) { // used to + verb (과거 습관) ≠ be used to + noun / -ing (익숙하다)
+      const nx = (txt.toLowerCase().match(/\bused to\s+([a-z']+)/) || [])[1] || '';
+      const beUsed = /\b(am|is|are|was|were|be|been|being|'m|'re|'s|get|got|gets|getting)\s+used to\b/i.test(txt) || /ing$|s$/.test(nx) || /^(the|a|an|my|your|his|her|our|their|it|this|that|these|those|working|living)$/.test(nx);
+      if (/\b(be|get) used to\b/i.test(ct) !== beUsed) continue;
+    }
+    // small words in the blue text that the card doesn't use don't count against it ('in his early 40s' ~ in one's 40s)
+    const tden = tw.filter(x => !HL_WEAK.has(x) || cw.some(w => sameWord(x, w))).length || tw.length;
+    const a = hit / cw.length, b = hit / tden;
     const sc = strict ? (a === 1 && b >= .5 ? a + b : 0) : (a >= .5 || (b >= .67 && hit >= 1) ? a + b : 0);
-    if (sc > score) { score = sc; best = it; }
+    if (sc && (hit > bestHit || (hit === bestHit && sc > score))) { score = sc; bestHit = hit; best = it; } // more shared words wins
   }
   return best;
 }
@@ -1184,11 +1248,11 @@ function findCard(txt, m, slideCards) {
   const note = m?.hlNotes && (m.hlNotes[txt.trim()] || m.hlNotes[txt.trim().toLowerCase()]);
   if (note) { const d = document.createElement('div'); d.className = 'mv-box'; const [mean, ...rest] = String(note).split(' · ');
     d.innerHTML = `<div class="mv-h">${esc(txt.trim())} <span class="mv-ko">${esc(mean)}</span></div>${rest.length ? `<p>${esc(rest.join(' · '))}</p>` : ''}`; return d; }
-  const c1 = bestMatch(txt, slideCards || [], c => hlWords(cardHead(c))); if (c1) return c1;
-  const c2 = bestMatch(txt, m?._pool || [], c => hlWords(cardHead(c))); if (c2) return c2;
-  const x = bestMatch(txt, (m?.expressions || []).filter(x => x.meaning || x.situation), x => hlWords(x.expr)); if (x) return exprCard(x);
+  const c1 = bestMatch(txt, slideCards || [], cardHead); if (c1) return c1;
+  const c2 = bestMatch(txt, m?._pool || [], cardHead); if (c2) return c2;
+  const x = bestMatch(txt, (m?.expressions || []).filter(x => x.meaning || x.situation), x => x.expr); if (x) return exprCard(x);
   if (!ALL_EXPR) { const seen = new Set(); ALL_EXPR = Object.values(DATA.memos).flatMap(mm => mm.expressions || []).filter(x => x.meaning && !seen.has(x.expr.toLowerCase()) && seen.add(x.expr.toLowerCase())); }
-  const g = bestMatch(txt, ALL_EXPR, x => hlWords(x.expr), true); return g ? exprCard(g) : null;
+  const g = bestMatch(txt, ALL_EXPR, x => x.expr, true); return g ? exprCard(g) : null;
 }
 // Expression cards from the memo's other slides (핵심 표현 / clinic): short English title + Korean explanation.
 function mvPool(parts) {
@@ -1250,17 +1314,17 @@ function wordForms(w) {
 function vocabPhrases(m) {
   if (m._vocab) return m._vocab;
   const out = [], seen = new Set();
-  const add = (raw, card) => {
+  const add = (raw, card, x) => { // every phrase keeps its own explanation (Ryan 2026-11-01: comply with opened 'trivial')
     for (let ph of raw.replace(/^\s*\d+[.)]\s*/, '').replace(/\(.*?\)|\[.*?\]|（.*?）/g, ' ').split(/\s*[\/·•,;]\s*|\s+vs\.?\s+/i)) {
       ph = ph.replace(/[~…"“”]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
       if (!ph || /[가-힣]/.test(ph) || ph.length < 4 || seen.has(ph)) continue;
       const ws = ph.split(' '); if (ws.length > 6 || (ws.length === 1 && ph.length < 5)) continue;
       const parts = ws.map((w, i) => /^(someone|somebody|something|sb|sth|one's|someone's|a|the)$/.test(w) ? (/^(a|the)$/.test(w) ? '(?:a|an|the)' : "[\\w']+(?:\\s[\\w']+)?") : (i === 0 ? `(?:${wordForms(w)})` : w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-      seen.add(ph); out.push({ re: new RegExp(`\\b${parts.join('\\s+')}\\b`, 'i'), card, len: ph.length });
+      seen.add(ph); out.push({ re: new RegExp(`\\b${parts.join('\\s+')}\\b`, 'i'), card, x, len: ph.length });
     }
   };
   for (const c of m._pool || []) add(cardHead(c), c);
-  for (const x of m.expressions || []) if (x.meaning || x.situation) add(x.expr, null), out[out.length - 1] && !out[out.length - 1].card && (out[out.length - 1].x = x);
+  for (const x of m.expressions || []) if (x.meaning || x.situation) add(x.expr, null, x);
   out.sort((a, b) => b.len - a.len);
   return m._vocab = out;
 }
