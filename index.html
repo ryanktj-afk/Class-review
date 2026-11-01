@@ -1843,13 +1843,12 @@ function grammarHub() {
     }).join('')}</div></div>`).join('')}</div>
   </div>`;
 }
-function grammarUnit(n, tab = 'sum') {
+function grammarUnit(n, tab = 'fill') {
   const u = GU.get(n); if (!u) return grammarHub();
-  const tabs = [['sum', '핵심 정리'], ['fill', `빈칸 ${u.fill.length}`], ['prod', `영작 ${u.production.length}`]];
+  if (tab !== 'prod') tab = 'fill'; // explanations removed (Ryan 2026-11-01): practice only
+  const tabs = [['fill', `빈칸 ${u.fill.length}`], ['prod', `영작 ${u.production.length}`]];
   let body = '';
-  if (tab === 'sum') body = `<div class="expr stack" style="gap:10px">${u.points.map(p => `<p style="margin:0">${esc(p)}</p>`).join('')}</div>
-    <button class="btn" id="go-all">이 유닛 섞어서 풀기</button>`;
-  if (tab === 'fill') body = `<button class="btn" id="go">빈칸 문제 풀기</button>` + u.fill.map(q => `<div class="expr"><p>${esc(q.text).replace(/___/g, () => '<span class="blank">&nbsp;</span>')}</p><p class="note">${esc(q.hint)}</p></div>`).join('');
+  if (tab === 'fill') body = `<div class="row" style="gap:8px"><button class="btn" id="go">빈칸 문제 풀기</button><button class="btn ghost" id="go-all">섞어서 풀기</button></div>` + u.fill.map(q => `<div class="expr">${q.ko ? `<p class="note" style="margin:0 0 4px">${esc(q.ko)}</p>` : ''}<p>${esc(q.text).replace(/___/g, () => '<span class="blank">&nbsp;</span>')}</p></div>`).join('');
   if (tab === 'prod') body = `<button class="btn" id="go">영작 문제 풀기</button>` + revealList(u.production);
   app.innerHTML = `${bar('grammar')}
   <div class="stack" style="gap:16px">
