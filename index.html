@@ -996,6 +996,12 @@ function memoView(m, box) {
     mvWrapInline(body);
     const kind = mvKind(p.label, p.title);
     const pop = (kind === 'nuance' && /^old-/.test(m.id) && mvPair(body, m)) || (kind === 'daily' || kind === 'work') && (mvArrow(body, m) || mvPair(body, m) || (!/[·•]/.test(p.title) && !/표현|어법|문법|vocab|word|expression|clinic|grammar/i.test(p.label + ' ' + p.title) && /^old-/.test(m.id) && mvBoxes(body, m)) || (/^old-/.test(m.id) && !/표현|어법|문법|vocab|word|expression|clinic|grammar|answer|정답|해설|연습|영작/i.test(p.label + ' ' + p.title) && mvCards(body, m))) // newer decks always use the quote box (mvPair);
+    // Older decks repeat a label row ('EXPRESSIONS 1 · Events & Baseball') and the slide title under the title: drop them so every memo looks like 아람님 메모 (Ryan 2026-11-01)
+    if (kind !== 'practice') {
+      const norm = t => t.replace(/[\s()（）·•&,:\-]+/g, '').toLowerCase();
+      for (const r of [...body.querySelectorAll('.mv-row')]) if (r.querySelector('.mv-chip') && !r.querySelector('input, .mv-btn, .mv-line, .mv-box, p') && r.textContent.trim().length < 80) r.remove();
+      for (const h of [...body.querySelectorAll('h3, .mv-h')]) { const a = norm(h.textContent), t = norm(p.title); if (a && t && (a === t || (a.length > 4 && t.includes(a)) || (t.length > 4 && a.includes(t)))) h.remove(); }
+    }
     body.querySelectorAll('.mv-line mark').forEach(mk => mk.classList.toggle('tap', !!mk._card)); // only expressions with an explanation look tappable
     return { ...p, kind, pop, units: mvUnits(body) };
   });
