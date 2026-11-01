@@ -349,9 +349,21 @@ body:has(.memo-mode) .wrap { padding-bottom: calc(12px + env(safe-area-inset-bot
 .mv-body p { margin: 0 }
 .mv-flat, .mv-box { display: grid; gap: 8px; min-width: 0 }
 .mv-box { background: var(--fill); border-radius: 14px; padding: 12px 14px }
-.mv-pair { display: grid; gap: 8px }
-.mv-ko-line { color: var(--sub); font-size: .95rem; line-height: 1.6; padding: 0 4px }
-.mv-ko-line p { margin: 0 }
+.mv-line { cursor: pointer; border-radius: 10px; margin: 0 -6px !important; padding: 2px 6px; transition: background .12s }
+.mv-line.on, .mv-line:hover { background: rgba(255,255,255,.7) }
+.mv-line mark { text-decoration: underline dotted; text-underline-offset: 4px }
+.mv-tip { margin: 2px 0 0; font-size: .85rem; color: var(--muted) }
+.mv-pop { position: fixed; left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 60; background: var(--surface); border-radius: 18px; box-shadow: 0 12px 40px rgba(0,0,0,.22); padding: 16px; display: grid; gap: 10px; max-height: 55vh; overflow-y: auto; animation: up .18s ease; font-size: .95rem; line-height: 1.6 }
+.mv-pop.float { right: auto; bottom: auto; animation: fade .12s ease }
+.mv-pop p { margin: 0 }
+.mv-pop .mv-box { background: var(--fill); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px }
+.mv-pop .mv-box.hit { outline: 2px solid var(--accent) }
+.mv-pop-k p { color: var(--ink) }
+.mv-pop-lb { font-size: .78rem; font-weight: 700; color: var(--accent) }
+.mv-pop-x { position: absolute; top: 8px; right: 8px; border: 0; background: var(--fill); color: var(--sub); width: 30px; height: 30px; border-radius: 50%; cursor: pointer }
+.mv-pop .mv-ex { color: var(--sub) }
+.mv-pop .mv-ko { color: var(--accent); font-weight: 600; font-size: .9rem }
+.mv-pop .mv-h { font-weight: 700 }
 .mv-box .mv-box { background: var(--surface); padding: 10px 12px; border-radius: 12px }
 .mv-quote { background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; display: grid; gap: 8px; font-size: 1rem; line-height: 1.7 }
 .mv-body mark { background: none; color: var(--accent); font-weight: 700; padding: 0 }
@@ -978,12 +990,13 @@ function memoView(m, box) {
     if (typeof p.body === 'string') body.innerHTML = p.body; else body.append(p.body);
     mvWrapInline(body);
     const kind = mvKind(p.label, p.title);
-    if (kind === 'daily' || kind === 'work') mvPair(body);
-    return { ...p, kind, units: mvUnits(body) };
+    const pop = (kind === 'daily' || kind === 'work') && mvPair(body, m);
+    return { ...p, kind, pop, units: mvUnits(body) };
   });
   box.innerHTML = `<div class="mv-stage"></div>
     <div class="mv-nav"><button class="mv-prev" aria-label="이전">‹ 이전</button><button class="mv-pos"></button><button class="mv-next" aria-label="다음">다음 ›</button></div>`;
   const stage = box.querySelector('.mv-stage');
+  const closePop = mvPop(stage);
   let pages = [], cur = 0;
   const cover = () => { const c = document.createElement('div'); c.className = 'mv-page mv-cover';
     c.innerHTML = `<span class="mv-label">${esc(m.date ? m.date.replace(/-/g, '.') : '')} 수업</span><h2>${esc(m.topic)}</h2>
@@ -1005,7 +1018,7 @@ function memoView(m, box) {
       const start = () => {
         part++;
         page = document.createElement('section'); page.className = `mv-page k-${s.kind}`;
-        page.innerHTML = `<header>${s.label ? `<span class="mv-label">${esc(s.label)}</span>` : ''}<h2>${esc(s.title)}${part > 1 ? ' <small>(이어서)</small>' : ''}</h2></header>`;
+        page.innerHTML = `<header>${s.label ? `<span class="mv-label">${esc(s.label)}</span>` : ''}<h2>${esc(s.title)}${part > 1 ? ' <small>(이어서)</small>' : ''}</h2>${s.pop ? `<p class="mv-tip">${matchMedia('(hover: hover) and (pointer: fine)').matches ? '문장에 마우스를 올리면' : '문장을 누르면'} 한국어 해설과 표현 설명이 떠요</p>` : ''}</header>`;
         bodyEl = document.createElement('div'); bodyEl.className = 'mv-body'; page.append(bodyEl);
         const ctrl = s.units.find(u => u.ctrl); if (ctrl) bodyEl.append(ctrl.node.cloneNode(true));
         stage.append(page); n = 0;
@@ -1035,7 +1048,7 @@ function memoView(m, box) {
     show(cur);
   }
   function show(i) {
-    cur = Math.max(0, Math.min(pages.length - 1, i));
+    cur = Math.max(0, Math.min(pages.length - 1, i)); closePop();
     stage.replaceChildren(pages[cur].el); stage.scrollTop = 0;
     box.querySelector('.mv-prev').disabled = cur === 0;
     const nx = box.querySelector('.mv-next'); nx.disabled = cur === pages.length - 1;
@@ -1098,41 +1111,112 @@ function memoView(m, box) {
   box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('.mv-in')) { e.preventDefault(); e.target.closest('.mv-page').querySelector('.mv-btn[data-act="check"]')?.click(); } });
   requestAnimationFrame(paginate);
 }
-// Splits a slide body into blocks that can move to the next page on their own.
-// Story slides: English, then its Korean, then the expression cards used in it, kept together as one block
-// so a page break never separates a sentence from its meaning (Ryan 2026-11-01).
+// Story slides (Ryan 2026-11-01): only the English stays on the page so a page never needs scrolling.
+// The Korean and the expression cards for each line are kept on the line and shown in a small window
+// when the line is tapped (phones) or the mouse rests on it (PC); see mvPop.
 const hangulShare = t => { const h = (t.match(/[가-힣]/g) || []).length, l = (t.match(/[A-Za-z]/g) || []).length; return h / Math.max(1, h + l); };
-function mvPair(body) {
-  const quote = body.querySelector('.mv-quote'); if (!quote) return;
+const normEn = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+function exprCard(x) {
+  const d = document.createElement('div'); d.className = 'mv-box';
+  d.innerHTML = `<div class="mv-h">${esc(x.expr)}${x.meaning ? ` <span class="mv-ko">${esc(x.meaning)}</span>` : ''}</div>${x.situation ? `<p>${esc(x.situation)}</p>` : ''}${x.nuance ? `<p>${esc(x.nuance)}</p>` : ''}${(x.examples || []).slice(0, 2).map(t => `<p class="mv-ex">${esc(t)}</p>`).join('')}`;
+  return d;
+}
+function mvPair(body, m) {
+  const quote = body.querySelector('.mv-quote'); if (!quote) return false;
   const boxes = [...body.querySelectorAll('.mv-box')].filter(b => !b.contains(quote) && !b.parentElement.closest('.mv-box'));
   const koBox = boxes.find(b => hangulShare(b.textContent) > .8);
   const cards = boxes.filter(b => b !== koBox && hangulShare(b.textContent) <= .8);
   const paras = el => { const ps = [...el.querySelectorAll(':scope > p, :scope > div')].filter(x => x.textContent.trim()); return ps.length ? ps : [el]; };
-  const en = paras(quote);
-  let ko = koBox ? paras(koBox) : [];
-  if (koBox && ko.length !== en.length) { // one Korean block for several English lines: cut it at line breaks or quoted lines
-    const t = koBox.innerText || koBox.textContent;
-    let bits = t.split(/\n+/).map(x => x.trim()).filter(Boolean);
-    if (bits.length !== en.length) bits = (t.match(/["“][^"”]+["”]/g) || []).map(x => x.trim());
-    if (bits.length === en.length) ko = bits.map(x => { const p = document.createElement('p'); p.textContent = x; return p; });
+  let en = paras(quote);
+  if (en.length === 1 && en[0] === quote) { const p = document.createElement('p'); p.append(...quote.childNodes); quote.append(p); en = [p]; }
+  // Korean for each line: given on the line > the lesson's own sentence list > the slide's Korean box cut to fit
+  let ko = en.map(e => e.dataset.ko || '');
+  // sentence by sentence from the lesson's story (same pairs 반복 말하기 uses, hand-checked where needed)
+  const map = new Map();
+  if (m?.sentences?.length) storyParts(m).forEach(p => p.units.forEach(u => { if (u.ko) map.set(normEn(u.en), u.ko); }));
+  ko = ko.map((k, i) => {
+    if (k) return k;
+    const ss = splitSent(en[i].textContent).map(normEn).filter(Boolean);
+    return ss.length && ss.every(x => map.has(x)) ? [...new Set(ss.map(x => map.get(x)))].join(' ') : '';
+  });
+  if (koBox && ko.some(k => !k)) { // else cut the slide's Korean box to fit the lines
+    const t = (koBox.innerText || koBox.textContent).trim();
+    const es = en.flatMap((e, i) => splitSent(e.textContent).map(x => ({ t: x, i })));
+    const al = alignKo(es.map(x => x.t), splitSent(t.replace(/["“”]/g, ' '), true));
+    const got = en.map(() => []); let at = 0;
+    al.forEach(([e, k]) => {
+      if (at >= es.length) return; got[es[at].i].push(k);
+      let a = 1; while (at + a < es.length && es.slice(at, at + a).map(x => x.t).join(' ') !== e) a++;
+      at += a;
+    });
+    ko = ko.map((k, i) => k || got[i].join(' ').trim());
   }
-  const groups = en.length === ko.length ? en.map((e, i) => ({ en: [e], ko: [ko[i]] })) : [{ en, ko }];
   const head = c => (c.querySelector('.mv-h') || c).textContent;
+  const cardFor = txt => {
+    const tw = hlWords(txt); let best = null, score = 0;
+    const same = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a))); // wrapp(ed) ~ wrap
+    for (const c of cards) { const cw = hlWords(head(c)); const sc = cw.filter(w => tw.some(x => same(x, w))).length / Math.max(1, cw.length); if (sc > score) { score = sc; best = c; } }
+    if (score >= .5) return best;
+    const x = m ? exprFor(m, txt) : null; return x ? exprCard(x) : null;
+  };
   const used = new Set();
-  for (const g of groups) {
-    const txt = g.en.map(e => e.textContent).join(' '), tw = new Set(hlWords(txt));
-    g.cards = cards.filter(c => { if (used.has(c)) return false; const cw = hlWords(head(c)); const ok = cw.length && cw.filter(w => tw.has(w)).length / cw.length >= .5; if (ok) used.add(c); return ok; });
+  en.forEach((e, i) => {
+    e.classList.add('mv-line');
+    const mine = [];
+    for (const mk of e.querySelectorAll('mark')) { const c = cardFor(mk.textContent); if (c) { mk._card = c; if (!mine.includes(c)) mine.push(c); used.add(c); } }
+    const tw = new Set(hlWords(e.textContent));
+    for (const c of cards) { if (used.has(c)) continue; const cw = hlWords(head(c)); if (cw.length && cw.filter(w => tw.has(w)).length / cw.length >= .5) { mine.push(c); used.add(c); } }
+    e._pop = { ko: ko[i], cards: mine };
+  });
+  const rest = cards.filter(c => !used.has(c));
+  if (rest.length) en[en.length - 1]._pop.cards.push(...rest);
+  cards.forEach(c => c.remove()); koBox?.remove();
+  return true;
+}
+// The small window with a line's Korean and its expressions. One window for the whole page.
+function mvPop(stage) {
+  const hover = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  let pop = null, line = null, tOpen, tClose;
+  const close = () => { clearTimeout(tOpen); pop?.remove(); pop = null; line?.classList.remove('on'); line = null; };
+  const open = (el, mk) => {
+    if (line === el && pop) return; close();
+    const d = el._pop; if (!d || (!d.ko && !d.cards.length)) return;
+    line = el; el.classList.add('on');
+    pop = document.createElement('div'); pop.className = 'mv-pop' + (hover ? ' float' : '');
+    const cs = mk?._card ? [mk._card, ...d.cards.filter(c => c !== mk._card)] : d.cards;
+    pop.innerHTML = `${hover ? '' : '<button class="mv-pop-x" aria-label="닫기">✕</button>'}${d.ko ? `<div class="mv-pop-k"><span class="mv-pop-lb">한국어 해설</span><p>${esc(d.ko)}</p></div>` : ''}${cs.length ? '<span class="mv-pop-lb">표현 설명</span>' : ''}`;
+    cs.forEach((c, k) => { const x = c.cloneNode(true); if (k === 0 && mk?._card) x.classList.add('hit'); pop.append(x); });
+    document.body.append(pop);
+    if (hover) { // next to the line: below it if there is room, otherwise above
+      const r = el.getBoundingClientRect(), w = Math.min(420, innerWidth - 24);
+      pop.style.width = w + 'px';
+      pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left)) + 'px';
+      const ph = pop.offsetHeight, below = innerHeight - r.bottom - 12;
+      pop.style.top = (below >= ph || below >= r.top ? r.bottom + 8 : Math.max(12, r.top - ph - 8)) + 'px';
+      pop.style.maxHeight = Math.max(160, below >= r.top ? below - 8 : r.top - 20) + 'px';
+      pop.onmouseenter = () => clearTimeout(tClose);
+      pop.onmouseleave = () => { tClose = setTimeout(close, 250); };
+    } else pop.querySelector('.mv-pop-x').onclick = close;
+  };
+  stage.addEventListener('click', e => {
+    const el = e.target.closest('.mv-line'); if (!el) return close();
+    if (line === el && pop && !hover) return close();
+    open(el, e.target.closest('mark'));
+  });
+  if (hover) {
+    stage.addEventListener('mouseover', e => {
+      const el = e.target.closest('.mv-line'); if (!el) return;
+      clearTimeout(tClose); const mk = e.target.closest('mark');
+      if (line === el && pop && !mk) return;
+      clearTimeout(tOpen); tOpen = setTimeout(() => { if (line === el && mk) { line = null; } open(el, mk); }, 150);
+    });
+    stage.addEventListener('mouseout', e => {
+      const el = e.target.closest('.mv-line'); if (!el || el.contains(e.relatedTarget)) return;
+      clearTimeout(tOpen); tClose = setTimeout(close, 250);
+    });
   }
-  groups[groups.length - 1].cards.push(...cards.filter(c => !used.has(c)));
-  const frag = document.createDocumentFragment();
-  for (const g of groups) {
-    const box = document.createElement('div'); box.className = 'mv-pair';
-    const q = document.createElement('div'); q.className = 'mv-quote'; q.append(...g.en); box.append(q);
-    if (g.ko.length) { const k = document.createElement('div'); k.className = 'mv-ko-line'; g.ko.forEach(x => k.append(...(x === koBox ? [...x.childNodes] : [x]))); box.append(k); }
-    frag.append(box, ...g.cards); // cards follow the lines they explain; a page break may fall between cards, never inside a pair
-  }
-  quote.replaceWith(frag);
-  koBox?.remove();
+  document.addEventListener('click', e => { if (pop && !pop.contains(e.target) && !stage.contains(e.target)) close(); });
+  return close;
 }
 function mvUnits(body) {
   const out = [];
@@ -1153,7 +1237,7 @@ function mvUnits(body) {
 // Memos that are apps, not slide decks: same sections, built from the lesson data.
 function mvFromData(m) {
   const parts = [];
-  if ((m.sentences || []).length) parts.push({ label: '내 이야기', title: '수업 때 내가 한 말', body: `<div class="mv-quote">${m.sentences.map(x => `<p>${markHl(x.en, x.hl)}</p>`).join('')}</div>${m.sentences.some(x => x.ko) ? `<div class="mv-box"><p>${m.sentences.map(x => esc(x.ko || '')).filter(Boolean).join(' ')}</p></div>` : ''}` });
+  if ((m.sentences || []).length) parts.push({ label: '내 이야기', title: '수업 때 내가 한 말', body: `<div class="mv-quote">${m.sentences.map(x => `<p data-ko="${esc(x.ko || '')}">${markHl(x.en, x.hl)}</p>`).join('')}</div>` });
   for (let i = 0; i < m.expressions.length; i += 4) parts.push({ label: `핵심 표현 ${i / 4 + 1}`, title: m.expressions.slice(i, i + 4).map(x => x.expr).join(' · '), body: `<div class="mv-grid" data-cols="2">${m.expressions.slice(i, i + 4).map(x => `<div class="mv-box"><div class="mv-h">${esc(x.expr)}${x.meaning ? ` <span class="mv-ko">${esc(x.meaning)}</span>` : ''}</div>${x.situation ? `<p>${esc(x.situation)}</p>` : ''}${x.nuance ? `<p>뉘앙스 · ${esc(x.nuance)}</p>` : ''}${x.examples.map(t => `<p class="mv-ex">${esc(t)}</p>`).join('')}</div>`).join('')}</div>` });
   for (let i = 0; i < m.fill.length; i += 5) parts.push({ label: `Practice ${i / 5 + 1}`, title: `빈칸 채우기 Q${String(i + 1).padStart(2, '0')}-Q${String(Math.min(i + 5, m.fill.length)).padStart(2, '0')}`, body: `<div class="mv-row"><button class="mv-btn main" data-act="check">정답 확인</button><button class="mv-btn" data-act="reset">다시 풀기</button></div>${m.fill.slice(i, i + 5).map((q, k) => `<div class="mv-box"><p><b>Q${String(i + k + 1).padStart(2, '0')}</b> ${esc(q.before)} <input class="mv-in" data-answer="${esc(q.answers.join(','))}" size="${Math.max(6, q.answers[0].length + 2)}" autocomplete="off" autocapitalize="off" spellcheck="false"> ${esc(q.after)}</p>${q.ko ? `<p class="mv-ex">${esc(q.ko)}</p>` : ''}</div>`).join('')}` });
   if (m.production.length) parts.push({ label: 'Production', title: '한국어를 영어로 말해 보기', body: `<div class="mv-row"><button class="mv-btn" data-act="all">모범 답안 모두 보기</button></div>${m.production.map((q, k) => `<div class="mv-box"><div class="mv-row"><span><b>Q${k + 1}</b> ${esc(q.ko)}</span><button class="mv-btn" data-act="ans" data-id="d${k}">답 보기</button></div><div class="mv-ans" id="mv-d${k}" hidden>${esc(q.en)}</div></div>`).join('')}` });
@@ -1207,11 +1291,15 @@ function lesson(id, tab) {
 // Full text first, then one sentence hidden at a time, then 2, 3 ... random sentences, then everything.
 // Stories are cut into chunks of 2-3 sentences; while one sentence is practised only that sentence is shown.
 function splitSent(t, ko) {
-  const re = ko ? /[^.!?。]+(?:[.!?。]+["”’)]*|$)/g : /[^.!?]+(?:[.!?]+["”’)]*|$)/g;
+  // keep abbreviations whole (a.m., Mr., U.S. ...) and closing quotes with their sentence
+  const ABBR = /\b(?:[aApP]\.[mM]\.(?!\s+[A-Z])|etc\.(?!\s+[A-Z])|U\.S\.(?!\s+[A-Z])|Mr\.|Mrs\.|Ms\.|Dr\.|St\.|vs\.|e\.g\.|i\.e\.|No\.(?=\s*\d)|(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.(?=\s*\d)|\d\.(?=\d))/g;
+  const keep = []; const src = String(t).replace(ABBR, m => `\u0001${keep.push(m) - 1}\u0002`);
+  const re = ko ? /[^.!?。]+(?:[.!?。]+["”’)'」』]*|$)/g : /(?:\b[aApP]\.(?=[mM]\.)|[^.!?])+(?:[.!?]+["”’)']*|$)/g;
   const out = [];
-  for (const x of (String(t).match(re) || []).map(x => x.trim()).filter(Boolean)) {
-    // glue short bits like "Mr." or "5 p.m." back on
-    if (out.length && (x.split(/\s+/).length < 3 || /^[a-z]/.test(x)) && !ko) out[out.length - 1] += ' ' + x; else out.push(x);
+  for (let x of (src.match(re) || []).map(x => x.trim()).filter(Boolean)) {
+    x = x.replace(/\u0001(\d+)\u0002/g, (_, i) => keep[i]);
+    // glue short bits and pieces that clearly continue the last sentence
+    if (out.length && !ko && (x.split(/\s+/).length < 3 || /^[a-z,;:)'"’”]/.test(x))) out[out.length - 1] += ' ' + x; else out.push(x);
   }
   return out;
 }
@@ -1243,7 +1331,8 @@ function alignKo(en, ko) {
 function storyParts(m) {
   const units = [];
   (m.sentences || []).forEach((p, pi) => {
-    alignKo(splitSent(p.en), splitSent((p.ko || '').replace(/["“”]/g, ' '), true))
+    const en = splitSent(p.en);
+    (p.kos && p.kos.length === en.length ? en.map((t, i) => [t, p.kos[i]]) : alignKo(en, splitSent((p.ko || '').replace(/["“”]/g, ' '), true)))
       .forEach(([t, k]) => units.push({ en: t, ko: k, para: pi, hl: p.hl.filter(h => t.toLowerCase().includes(h.toLowerCase())) }));
   });
   const parts = []; let cur = [];
@@ -1406,7 +1495,7 @@ function contextOf(el, w) {
   return splitSent(text).find(x => new RegExp(`\\b${reEsc(w)}\\b`, 'i').test(x)) || text.slice(0, 200);
 }
 app.addEventListener('click', e => {
-  if (!EXTRAS || !me || e.target.closest('button, input, textarea, a, .bar, .gap:not(.open)')) return;
+  if (!EXTRAS || !me || e.target.closest('button, input, textarea, a, .bar, .gap:not(.open), .mv-line')) return; // story lines open their own window
   const area = e.target.closest(TAP_AREAS); if (!area) return;
   const w = wordAt(e.clientX, e.clientY); if (!w) return;
   e.stopPropagation(); e.preventDefault();
