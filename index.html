@@ -726,7 +726,7 @@ let SHARED = null;
 async function loadMemos(tok) {
   if (!CFG.url) return;
   const [ms, sh] = await Promise.all([api.getMemos(tok), api.getShared(tok)]);
-  DATA.memos = ms || {}; SHARED = sh || []; EXPR_CACHE = null;
+  DATA.memos = ms || {}; SHARED = sh || []; EXPR_CACHE = null; dropNames();
   if (DATA.memos._groups) { GROUPS = DATA.memos._groups.groups || []; delete DATA.memos._groups; }
 }
 async function enter(s) {
@@ -840,6 +840,57 @@ function home() {
 
 // Every expression from every class (also from students who left), shared with all students. Personal story sentences stay out.
 let EXPR_CACHE = null;
+// ---------- names are not expressions (Ryan 2026-11-01: 'Seolhee' is a name; 'couldn't' is not part of 'make it') ----------
+// A lesson expression that is only an English name with its Korean name as the meaning (Seolhee 설희, Sam 샘) is dropped,
+// and names / a leading couldn't · can't · didn't are taken off the blue words.
+const isNameExpr = x => { const e = String(x?.expr || '').trim(), k = String(x?.meaning || '').trim();
+  return /^[A-Z][a-z]+$/.test(e) && /^[가-힣]{1,4}(\s*(씨|님))?$/.test(k) && !/다$/.test(k) && !(DATA.dict && DATA.dict[e.toLowerCase()]); }; // not See 보이다 / Paradox 역설
+let NAMES = null;
+function dropNames() {
+  NAMES = new Set();
+  for (const m of Object.values(DATA.memos || {})) {
+    if (!m || !Array.isArray(m.expressions)) continue;
+    m.expressions = m.expressions.filter(x => { if (isNameExpr(x)) { NAMES.add(x.expr.trim().toLowerCase()); return false; } return true; });
+    delete m._vocab;
+  }
+  EXPR_CACHE = null; ALL_EXPR = null;
+}
+const nameSet = () => { if (!NAMES) dropNames(); return NAMES; };
+const NEG_LEAD = /^(couldn['’]t|can['’]t|cannot|didn['’]t|don['’]t|doesn['’]t|won['’]t|wouldn['’]t|isn['’]t|wasn['’]t|aren['’]t|weren['’]t|haven['’]t|hasn['’]t|hadn['’]t|shouldn['’]t)$/i;
+const NEG_KEEP = /^(couldn['’]t|can['’]t|cannot)\s+(care less|agree more|help|stand|wait|believe|bear|get enough)\b/i; // the 'not' is part of these
+function cleanHl(h, neg) { // neg: also take off a leading couldn't / can't / didn't …
+  let t = String(h || '').trim();
+  for (;;) {
+    const w = (t.match(/^[^\s]+/) || [''])[0], bare = w.replace(/[^A-Za-z'’]/g, '');
+    if (!w) break;
+    if (nameSet().has(bare.toLowerCase()) || (neg && NEG_LEAD.test(bare) && !NEG_KEEP.test(t) && t.split(/\s+/).length > 1)) t = t.slice(w.length).replace(/^[\s,]+/, '');
+    else break;
+  }
+  return t;
+}
+const isNameCard = c => { const ws = (String(c && (c.querySelector?.('.mv-h, h3, b, strong') || c).textContent || '').match(/[A-Za-z]+/g) || []); return ws.length === 1 && nameSet().has(ws[0].toLowerCase()); };
+// Blue words already on a story page: unmark names, take a leading couldn't / name off, find the explanation again.
+function cleanMarks(body, m) {
+  for (const mk of [...body.querySelectorAll('.mv-line mark')]) {
+    const t = mk.textContent, line = mk.closest('.mv-line'), cards = line?._pop?.cards || [];
+    // the negation goes only when the explanation is about the rest: couldn't make it → make it, but can't afford to splurge stays
+    const head = mk._card && !isNameCard(mk._card) ? (mk._card.querySelector('.mv-h, h3, b, strong') || mk._card).textContent : '';
+    const c = cleanHl(t, !/n['’]t\b|cannot|\bnot\b/i.test(head));
+    const drop = card => { const i = cards.indexOf(card); if (i >= 0 && ![...line.querySelectorAll('mark')].some(o => o !== mk && o._card === card)) cards.splice(i, 1); };
+    if (!c) { drop(mk._card); mk.replaceWith(...mk.childNodes); continue; }
+    if (c !== t.trim()) {
+      const cut = t.lastIndexOf(c), pre = mk.firstChild; // the words taken off move just before the mark
+      if (cut > 0 && pre?.nodeType === 3 && pre.nodeValue.length >= cut) { pre.splitText(cut); mk.before(pre); }
+    }
+    if (c !== t.trim() || isNameCard(mk._card)) {
+      const old = mk._card, keep = old && !isNameCard(old) && bestMatch(mk.textContent, [old], cardHead);
+      const nc = keep ? old : findCard(mk.textContent, m, cards.filter(x => !isNameCard(x))) || (isNameCard(old) ? null : old);
+      if (nc !== old) { drop(old); if (nc && !cards.includes(nc)) cards.push(nc); }
+      mk._card = nc;
+    }
+  }
+}
+
 function allExpr() {
   if (EXPR_CACHE) return EXPR_CACHE;
   if (SHARED) return EXPR_CACHE = SHARED;
@@ -1004,6 +1055,7 @@ function memoView(m, box) {
       for (const r of [...body.querySelectorAll('.mv-row')]) if (r.querySelector('.mv-chip') && !r.querySelector('input, .mv-btn, .mv-line, .mv-box, p') && r.textContent.trim().length < 80) r.remove();
       for (const h of [...body.querySelectorAll('h3, .mv-h')]) { const a = norm(h.textContent), t = norm(p.title); if (a && t && (a === t || (a.length > 4 && t.includes(a)) || (t.length > 4 && a.includes(t)))) h.remove(); }
     }
+    cleanMarks(body, m);
     body.querySelectorAll('.mv-line mark').forEach(mk => mk.classList.toggle('tap', !!mk._card)); // only expressions with an explanation look tappable
     return { ...p, kind, pop, units: mvUnits(body) };
   });
@@ -1175,7 +1227,7 @@ const sameWord = (a, b) => {
   return rest != null && (/^(s|es|e|d|ed|r|er|ing)$/.test(rest) || (rest === 'ly' && s.length >= 5) || rest === s.slice(-1)); // personally ~ personal, but not really ~ real
 };
 // Small words (particles, pronouns) never make a match on their own: 'caught up with' is not the 'WITH' card.
-const HL_WEAK = new Set(['be', 'with', 'from', 'into', 'about', 'out', 'off', 'over', 'by', 'as', 'so', 'and', 'or', 'that', 'this', 'what', 'who', 'here', 'there', 'me', 'you', 'him', 'her', 'it', 'them', 'us', 'my', 'your', 'his', 'their', 'our', 'i', 'he', 'she', 'we', 'they', 'not', 'no', 'do', 'did', 'have', 'had', 'get', 'got', 'go', 'make', 'take', 'like', 'just', 'than', 'too', 'very', 'all', 'some', 'any', 'only', 'back', 'down', 'away', 'around', 'through', 'after', 'before', 'without', 'thing'].map(w => w.replace(/(ing|ed|es|s)$/, ''))); // same endings cut as hlWords
+const HL_WEAK = new Set(["couldn't", "can't", "cannot", "didn't", "don't", "doesn't", "won't", "wouldn't", "isn't", "wasn't", "aren't", "weren't", "haven't", "hasn't", "hadn't", "shouldn't", 'be', 'with', 'from', 'into', 'about', 'out', 'off', 'over', 'by', 'as', 'so', 'and', 'or', 'that', 'this', 'what', 'who', 'here', 'there', 'me', 'you', 'him', 'her', 'it', 'them', 'us', 'my', 'your', 'his', 'their', 'our', 'i', 'he', 'she', 'we', 'they', 'not', 'no', 'do', 'did', 'have', 'had', 'get', 'got', 'go', 'make', 'take', 'like', 'just', 'than', 'too', 'very', 'all', 'some', 'any', 'only', 'back', 'down', 'away', 'around', 'through', 'after', 'before', 'without', 'thing'].map(w => w.replace(/(ing|ed|es|s)$/, ''))); // same endings cut as hlWords
 const cardHead = c => (c.querySelector('.mv-h, h3, b, strong') || c).textContent;
 // Words for matching: like hlWords, but took → take, psychiatrist's → psychiatrist (Ryan 2026-11-01).
 let IRR_BASE = null;
@@ -1183,10 +1235,11 @@ const baseOf = w => { if (!IRR_BASE) { IRR_BASE = { shown: 'show', drew: 'draw',
   for (const [k, v] of Object.entries(IRREG)) for (const f of v.split('|')) if (!IRR_BASE[f]) IRR_BASE[f] = k; } return IRR_BASE[w] || w; };
 const mWords = t => (String(t).toLowerCase().replace(/\(.*?\)/g, ' ').replace(/’/g, "'").match(/[a-z0-9']+/g) || [])
   .filter(w => !HL_STOP.has(w)).map(w => w.replace(/'s?$/, '')).filter(w => w && !HL_STOP.has(w))
+  .filter(w => !(NAMES && NAMES.has(w))) // names never make a match: Seolhee couldn't make it ≠ Seolhee couldn't come
   .map(w => { const b0 = baseOf(w); return b0 !== w ? b0 : w.replace(/(ing|ed|es|s)$/, ''); }).filter(Boolean);
 // When only small words are shared, the whole phrase must be there, in order: 'had to serve' → had to, 'took over' → take over,
 // but not 'had ramen' → had to or 'make breakfast' → make up for.
-const PH_SKIP = /^(someone|somebody|something|sb|sth|one's|someone's|ing)$/;
+const PH_SKIP = /^(someone|somebody|something|sb|sth|one's|someone's|ing|p|pp|v|o)$/; // placeholders: shouldn't have p.p.
 function phraseIn(cardTxt, txt) {
   const toks = t => (String(t).toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').match(/[a-z0-9']+/g) || []).map(w => baseOf(w));
   const mt = toks(txt);
@@ -1226,7 +1279,7 @@ function bestMatch(txt, items, textOf, strict) {
   const tw = mWords(txt); if (!tw.length) return null;
   let best = null, score = 0, bestHit = 0;
   for (const it of items) {
-    const ct = textOf(it), cw = mWords(ct); if (!cw.length) continue;
+    const ct = textOf(it), cw = mWords(ct); if (!cw.length || (cw.length === 1 && nameSet().has(cw[0]))) continue; // a name is not an explanation
     const hits = cw.filter(w => tw.some(x => sameWord(x, w))), hit = hits.length;
     if (hit && hits.every(w => HL_WEAK.has(w)) && (strict || !phraseIn(ct, txt))) continue; // only small words in common
     if (hit && particleClash(ct, txt)) continue;
@@ -1956,7 +2009,7 @@ function frontOf(x) {
 const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function markHl(en, hl, blank) {
   let out = esc(en);
-  [...hl].sort((a, b) => b.length - a.length).forEach(h => {
+  [...(hl || [])].map(h => cleanHl(h)).filter(Boolean).sort((a, b) => b.length - a.length).forEach(h => {
     out = out.replace(new RegExp(reEsc(esc(h)), 'i'), blank ? '<span class="blank">&nbsp;</span>' : m => `<mark>${m}</mark>`);
   });
   return out;
@@ -2687,5 +2740,6 @@ document.addEventListener('focusin', e => { if (e.target.matches('input, textare
 document.addEventListener('focusout', () => document.body.classList.remove('typing'));
 function route() { if (window.DEMO && !me) return demo(window.DEMO); if (location.hash === '#view' && me?.viewOnly) return; if (location.hash === '#view') return restoreView(); if (location.hash === '#admin') admin(); else login(); }
 window.addEventListener('hashchange', route);
+dropNames();
 route();
 </script>
