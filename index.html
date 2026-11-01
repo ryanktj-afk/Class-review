@@ -836,8 +836,9 @@ function dict(q = '') {
     <h1 style="font-size:1.6rem">모두의 표현 사전</h1>
     <input class="answer-in" id="dq" type="search" placeholder="영어나 한국어로 검색 (예: 회식, take on)" value="${esc(q)}" autocomplete="off">
     <span class="label">${ql ? `검색 결과 ${hits.length}개` : `오늘의 랜덤 표현 20개 · 전체 ${list.length.toLocaleString()}개`}</span>
-    <div class="stack cols" style="gap:10px">${hits.slice(0, 80).map(exprHTML).join('') || '<p class="muted">찾는 표현이 없어요. 다른 단어로 검색해 보세요.</p>'}</div>
+    <div class="stack cols" id="dbody" style="gap:10px">${hits.slice(0, 80).map(exprHTML).join('') || '<p class="muted">찾는 표현이 없어요. 다른 단어로 검색해 보세요.</p>'}</div>
   </div>`;
+  pager(document.getElementById('dbody'));
   const i = document.getElementById('dq');
   i.oninput = () => { clearTimeout(i._t); i._t = setTimeout(() => { dict(i.value); const n = document.getElementById('dq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
 }
@@ -1138,9 +1139,10 @@ function lesson(id, tab) {
     </div>`}
     ${hasMemo ? `<div class="modeswitch" role="tablist"><button role="tab" aria-selected="${tab === 'memo'}" data-tab="memo">📄 수업 복습</button><button role="tab" aria-selected="${tab !== 'memo'}" data-tab="${practiceTab}">🗣️ 반복 말하기</button></div>` : ''}
     ${tab === 'memo' ? '' : `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}</button>`).join('')}</div>`}
-    <div class="stack ${tab === 'speak' || tab === 'prod' || tab === 'memo' ? '' : 'cols'}" style="gap:10px">${body}</div>
+    <div class="stack ${tab === 'speak' || tab === 'prod' || tab === 'memo' ? '' : 'cols'}" id="lbody" style="gap:10px">${body}</div>
   </div>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => lesson(id, b.dataset.tab));
+  if (['expr', 'sent', 'fill'].includes(tab)) pager(document.getElementById('lbody'));
   if (tab === 'prod') bindReveal();
   if (tab === 'memo') {
     const draw = () => { const box = app.querySelector('.mv'); if (box) memoView(m, box); };
@@ -1154,7 +1156,7 @@ function lesson(id, tab) {
 
 // ---------- 내 이야기 말하기: the student's own story, blanks grow step by step ----------
 // Full text first, then one sentence hidden at a time, then 2, 3 ... random sentences, then everything.
-// Long stories are cut into parts of about 5 sentences so each ladder stays short.
+// Stories are cut into chunks of 2-3 sentences; while one sentence is practised only that sentence is shown.
 function splitSent(t, ko) {
   const re = ko ? /[^.!?。]+(?:[.!?。]+["”’)]*|$)/g : /[^.!?]+(?:[.!?]+["”’)]*|$)/g;
   const out = [];
@@ -1199,7 +1201,8 @@ function storyParts(m) {
   units.forEach((u, i) => {
     cur.push(u);
     const next = units[i + 1];
-    if (!next || cur.length >= 7 || (cur.length >= 4 && next.para !== u.para)) { parts.push(cur); cur = []; }
+    // Ryan 2026-11-01: small chunks (2-3 sentences that belong together) so a screen never holds a long passage
+    if (!next || cur.length >= 3 || (cur.length >= 2 && next.para !== u.para)) { parts.push(cur); cur = []; }
   });
   return parts.map(units => ({ units, ko: [...new Set(units.map(u => m.sentences[u.para].ko).filter(Boolean))].join(' ') }));
 }
@@ -1212,7 +1215,7 @@ function ladder(n) {
 }
 const stepName = st => st.mode === 'full' ? '전체 읽기' : st.mode === 'one' ? `${st.i + 1}번째 문장 비우기` : st.mode === 'rand' ? `랜덤 ${st.k}문장 비우기` : '전부 비우기 · 혼자 말하기';
 const firstLetters = t => t.split(/\s+/).map(w => w.replace(/^([^A-Za-z]*[A-Za-z])[A-Za-z'’-]*/, (_, a) => a + '_')).join(' ');
-const speakKey = id => `r:${id}`;
+const speakKey = id => `r2:${id}`; // r2: chunks got smaller (2026-11-01), old progress no longer lines up
 function speakStatus(m) {
   const parts = storyParts(m), r = state[speakKey(m.id)];
   if (!r) return { text: '아직 시작 안 했어요', pct: 0, parts };
@@ -1239,14 +1242,14 @@ function speak(id, part, step) {
       <div class="card">
         <div class="row" style="justify-content:space-between;gap:8px"><b>${step + 1}단계 · ${stepName(st)}</b>${st.mode === 'full' ? sayBtn(P.units.map(u => u.en).join(' ')) : ''}</div>
         <p class="muted" style="margin:0;font-size:.92rem">${st.mode === 'full' ? '소리 내서 전체를 읽어 보세요.' : '빈칸 부분을 영어로 소리 내서 말해 본 다음 정답을 확인하세요.'}</p>
-        <div class="passage">${P.units.map((u, k) => !blank.has(k) ? `<span class="s">${markHl(u.en, u.hl)}</span>`
+        <div class="passage">${P.units.map((u, k) => st.mode === 'one' && k !== st.i ? '' : !blank.has(k) ? `<span class="s">${markHl(u.en, u.hl)}</span>`
           : `<span class="s gap ${open ? 'open' : ''}">${u.ko ? `<span class="ko">${esc(u.ko)}</span>` : `<span class="muted">${k + 1}번째 문장</span>`}
              ${hints && !open ? `<span class="hint" style="display:block;margin-top:4px">${esc(firstLetters(u.en))}</span>` : ''}
              ${open ? `<span class="en">${sayBtn(u.en)}${markHl(u.en, u.hl)}</span>` : ''}</span>`).join('')}</div>
         ${P.ko && blank.size && P.units.some((u, k) => blank.has(k) && !u.ko) ? `<button class="ghost" id="ko" style="justify-self:start">${showKo ? '우리말 숨기기' : '우리말 전체 보기'}</button>${showKo ? `<p class="note">${esc(P.ko)}</p>` : ''}` : ''}
       </div>
       ${st.mode === 'full' ? `<button class="btn" id="next">다 읽었어요 · 다음 단계</button>`
-        : !open ? `<div class="row" style="gap:8px"><button class="btn secondary" id="hint" style="flex:1">${hints ? '힌트 숨기기' : '첫 글자 힌트'}</button><button class="btn" id="reveal" style="flex:2">정답 보기</button></div>`
+        : !open ? `<div class="row" style="gap:8px"><button class="btn secondary" id="hint" style="flex:1;white-space:nowrap;padding:0 10px">${hints ? '힌트 숨기기' : '💡 힌트'}</button><button class="btn" id="reveal" style="flex:2">정답 보기</button></div>`
         : `<div class="grades"><button class="grade again" id="again">한 번 더<small>같은 단계</small></button><button class="grade good" id="next">잘 말했어요<small>${step + 1 < steps.length ? '다음 단계' : part + 1 < parts.length ? '다음 부분' : '끝!'}</small></button></div>`}
       <div class="stepnav"><button id="prevstep" ${part === 0 && step === 0 ? 'disabled' : ''}>‹ 이전</button><button id="nextstep" ${part === parts.length - 1 && step === steps.length - 1 ? 'disabled' : ''}>다음 ›</button></div>
     </div>`;
@@ -1393,16 +1396,38 @@ function wordbook() {
     <p class="muted">수업 문장에서 모르는 단어를 누르면 여기에 모여요. 카드로 연습하면 잊을 때쯤 다시 나와요.</p>
     <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn" id="wb-go" style="flex:1" ${ws.length ? '' : 'disabled'}>카드 연습${ws.length ? ` · ${due.length ? `오늘 ${due.length}개` : `${ws.length}개`}` : ''}</button>
     <button class="btn secondary" id="wb-quiz" style="flex:1" ${ws.length ? '' : 'disabled'}>단어 퀴즈</button></div>
-    ${ws.length ? `<div class="group">${ws.map(e => `<div class="wb-row"><div class="t"><b>${esc(e.w)}</b><span>${esc(e.m || '뜻 미입력')}</span>${e.ctx ? `<p class="wb-ctx">${markHl(e.ctx, [e.w])}</p>` : ''}</div>
+    ${ws.length ? `<div class="group" id="wbody">${ws.map(e => `<div class="wb-row"><div class="t"><b>${esc(e.w)}</b><span>${esc(e.m || '뜻 미입력')}</span>${e.ctx ? `<p class="wb-ctx">${markHl(e.ctx, [e.w])}</p>` : ''}</div>
       <button class="wb-del" data-del="${esc(e.id)}" aria-label="빼기">✕</button></div>`).join('')}</div>`
       : '<div class="expr"><p>아직 넣은 단어가 없어요.</p><p class="muted">수업 문장, 예문, 정답 속 영어 단어를 눌러 보세요.</p></div>'}
   </div>`;
+  pager(document.getElementById('wbody'), '.wb-row');
   document.getElementById('wb-go').onclick = () => cards(due.length ? due : shuffle(wordCards()));
   document.getElementById('wb-quiz').onclick = () => quiz(wordQuiz(), wordbook);
   app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { state[b.dataset.del] = { ...state[b.dataset.del], gone: true, t: Date.now() }; saveSoon(); wordbook(); });
 }
 
 // 영작 list shown like slides: Korean, then its English, then the next Korean ... one piece per tap (Ryan 2026-10-30).
+// Mobile: long lists show one item at a time with 이전 / 다음 (Ryan 2026-11-01: too much on one screen hurts focus).
+const MOBILE = () => matchMedia('(max-width: 959px)').matches;
+function pager(box, sel = '.expr') {
+  if (!box || !MOBILE()) return;
+  const items = [...box.querySelectorAll(':scope > ' + sel)]; if (items.length < 2) return;
+  let i = 0;
+  const nav = document.createElement('div'); nav.className = 'stepnav';
+  nav.innerHTML = '<button data-p="-1">‹ 이전</button><span class="muted" style="align-self:center;font-weight:600"></span><button data-p="1">다음 ›</button>';
+  box.after(nav);
+  const draw = () => {
+    items.forEach((el, k) => { el.style.display = k === i ? '' : 'none'; });
+    nav.querySelector('span').textContent = `${i + 1} / ${items.length}`;
+    nav.querySelector('[data-p="-1"]').disabled = i === 0; nav.querySelector('[data-p="1"]').disabled = i === items.length - 1;
+  };
+  const step = d => { i = Math.max(0, Math.min(items.length - 1, i + d)); draw(); };
+  nav.querySelectorAll('[data-p]').forEach(b => b.onclick = () => step(+b.dataset.p));
+  let x0 = null;
+  box.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1); });
+  draw();
+}
 function revealList(items) {
   return `<div class="reveal" id="reveal-list">${items.map((q, i) => `<div class="expr rv-item">
       <div class="rv ko" data-rv><span class="qn">${i + 1}</span>${esc(q.ko)}</div>
@@ -1416,6 +1441,7 @@ function bindReveal() {
   const draw = () => {
     parts.forEach((el, k) => el.classList.toggle('shown', k < n));
     box.querySelectorAll('.rv-item').forEach(it => it.classList.toggle('shown', it.querySelector('.ko').classList.contains('shown')));
+    if (MOBILE()) { const cur = parts[n - 1].closest('.rv-item'); box.querySelectorAll('.rv-item').forEach(it => { it.style.display = it === cur ? '' : 'none'; }); }
     document.getElementById('rv-prev').disabled = n <= 1;
     document.getElementById('rv-next').disabled = n >= parts.length;
     const last = parts[n - 1]; if (last && n > 1) last.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
