@@ -1146,6 +1146,9 @@ function bestMatch(txt, items, wordsOf, strict) {
 }
 let ALL_EXPR = null;
 function findCard(txt, m, slideCards) {
+  const note = m?.hlNotes && (m.hlNotes[txt.trim()] || m.hlNotes[txt.trim().toLowerCase()]);
+  if (note) { const d = document.createElement('div'); d.className = 'mv-box'; const [mean, ...rest] = String(note).split(' · ');
+    d.innerHTML = `<div class="mv-h">${esc(txt.trim())} <span class="mv-ko">${esc(mean)}</span></div>${rest.length ? `<p>${esc(rest.join(' · '))}</p>` : ''}`; return d; }
   const c1 = bestMatch(txt, slideCards || [], c => hlWords(cardHead(c))); if (c1) return c1;
   const c2 = bestMatch(txt, m?._pool || [], c => hlWords(cardHead(c))); if (c2) return c2;
   const x = bestMatch(txt, (m?.expressions || []).filter(x => x.meaning || x.situation), x => hlWords(x.expr)); if (x) return exprCard(x);
