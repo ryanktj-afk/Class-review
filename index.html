@@ -995,8 +995,9 @@ function memoView(m, box) {
     if (typeof p.body === 'string') body.innerHTML = p.body; else body.append(p.body);
     mvWrapInline(body);
     const kind = mvKind(p.label, p.title);
-    const pop = (kind === 'nuance' && /^old-/.test(m.id) && mvPair(body, m)) || (kind === 'daily' || kind === 'work') && (mvArrow(body, m) || mvPair(body, m) || (!/[·•]/.test(p.title) && !/표현|어법|문법|vocab|word|expression|clinic|grammar/i.test(p.label + ' ' + p.title) && /^old-/.test(m.id) && mvBoxes(body, m)) || (/^old-/.test(m.id) && !/표현|어법|문법|vocab|word|expression|clinic|grammar|answer|정답|해설|연습|영작/i.test(p.label + ' ' + p.title) && mvCards(body, m))) // newer decks always use the quote box (mvPair);
-    if (pop) mvSplitLines(body, m);
+    const wordSlide = !/^(aram|bft|giu|jaegyu|najeong|christina|yongyeon|heejin)-/.test(m.id) && /표현|어법|문법|어휘|단어|짝꿍|용법|vocab|word|expression|clinic|grammar|phrase|\bvs\b/i.test(p.label + ' ' + p.title); // word / grammar slides stay as cards (Ryan 2026-11-01)
+    const pop = !wordSlide && ((kind === 'nuance' && /^old-/.test(m.id) && mvPair(body, m)) || (kind === 'daily' || kind === 'work') && (mvArrow(body, m) || mvPair(body, m) || (!/[·•]/.test(p.title) && !/표현|어법|문법|어휘|단어|짝꿍|vocab|word|expression|clinic|grammar|phrase/i.test(p.label + ' ' + p.title) && /^old-/.test(m.id) && mvBoxes(body, m)) || (/^old-/.test(m.id) && !/표현|어법|문법|어휘|단어|짝꿍|vocab|word|expression|clinic|grammar|phrase|answer|정답|해설|연습|영작/i.test(p.label + ' ' + p.title) && mvCards(body, m)))); // newer decks always use the quote box (mvPair)
+    if (pop) { mvSplitLines(body, m); mvMarkVocab(body, m); }
     // Older decks repeat a label row ('EXPRESSIONS 1 · Events & Baseball') and the slide title under the title: drop them so every memo looks like 아람님 메모 (Ryan 2026-11-01)
     if (kind !== 'practice') {
       const norm = t => t.replace(/[\s()（）·•&,:\-]+/g, '').toLowerCase();
@@ -1235,6 +1236,46 @@ function mvSplitLines(body, m) {
     ln.replaceWith(...out);
   }
 }
+// Expressions from the memo's word slides (어휘 정리 / 핵심 표현) that appear in a story line get the blue mark too,
+// even when the verb changes (take on → took on). Ryan 2026-11-01.
+const IRREG = { be: 'am|is|are|was|were|been|being', have: 'has|had|having', do: 'does|did|done|doing', go: 'goes|went|gone|going', get: 'gets|got|gotten|getting', take: 'takes|took|taken|taking', make: 'makes|made|making', come: 'comes|came|coming', give: 'gives|gave|given|giving', catch: 'catches|caught|catching', run: 'runs|ran|running', keep: 'keeps|kept|keeping', find: 'finds|found|finding', hold: 'holds|held|holding', bring: 'brings|brought|bringing', think: 'thinks|thought|thinking', buy: 'buys|bought|buying', put: 'puts|putting', set: 'sets|setting', break: 'breaks|broke|broken|breaking', fall: 'falls|fell|fallen|falling', let: 'lets|letting', say: 'says|said|saying', tell: 'tells|told|telling', see: 'sees|saw|seen|seeing', leave: 'leaves|left|leaving', feel: 'feels|felt|feeling', stand: 'stands|stood|standing', pay: 'pays|paid|paying', send: 'sends|sent|sending', spend: 'spends|spent|spending', lose: 'loses|lost|losing', win: 'wins|won|winning', sit: 'sits|sat|sitting', wear: 'wears|wore|worn|wearing', hang: 'hangs|hung|hanging', eat: 'eats|ate|eaten|eating', drive: 'drives|drove|driven|driving', grow: 'grows|grew|grown|growing', throw: 'throws|threw|thrown|throwing', blow: 'blows|blew|blown|blowing', wake: 'wakes|woke|woken|waking', meet: 'meets|met|meeting', fight: 'fights|fought|fighting', sleep: 'sleeps|slept|sleeping', stick: 'sticks|stuck|sticking', write: 'writes|wrote|written|writing', ride: 'rides|rode|ridden|riding', choose: 'chooses|chose|chosen|choosing' };
+function wordForms(w) {
+  if (IRREG[w]) return `${w}|${IRREG[w]}`;
+  if (!/^[a-z]{3,}$/.test(w)) return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stem = w.replace(/e$/, ''), dbl = /[^aeiou][aeiou][bdgmnprt]$/.test(w) ? w + w.slice(-1) : w, y = w.replace(/y$/, 'i');
+  return [...new Set([w, w + 's', w + 'es', stem + 'ed', w + 'd', stem + 'ing', dbl + 'ed', dbl + 'ing', y + 'ed', y + 'es'])].join('|');
+}
+function vocabPhrases(m) {
+  if (m._vocab) return m._vocab;
+  const out = [], seen = new Set();
+  const add = (raw, card) => {
+    for (let ph of raw.replace(/^\s*\d+[.)]\s*/, '').replace(/\(.*?\)|\[.*?\]|（.*?）/g, ' ').split(/\s*[\/·•,;]\s*|\s+vs\.?\s+/i)) {
+      ph = ph.replace(/[~…"“”]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!ph || /[가-힣]/.test(ph) || ph.length < 4 || seen.has(ph)) continue;
+      const ws = ph.split(' '); if (ws.length > 6 || (ws.length === 1 && ph.length < 5)) continue;
+      const parts = ws.map((w, i) => /^(someone|somebody|something|sb|sth|one's|someone's|a|the)$/.test(w) ? (/^(a|the)$/.test(w) ? '(?:a|an|the)' : "[\\w']+(?:\\s[\\w']+)?") : (i === 0 ? `(?:${wordForms(w)})` : w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      seen.add(ph); out.push({ re: new RegExp(`\\b${parts.join('\\s+')}\\b`, 'i'), card, len: ph.length });
+    }
+  };
+  for (const c of m._pool || []) add(cardHead(c), c);
+  for (const x of m.expressions || []) if (x.meaning || x.situation) add(x.expr, null), out[out.length - 1] && !out[out.length - 1].card && (out[out.length - 1].x = x);
+  out.sort((a, b) => b.len - a.len);
+  return m._vocab = out;
+}
+function mvMarkVocab(body, m) {
+  const list = vocabPhrases(m); if (!list.length) return;
+  for (const ln of body.querySelectorAll('.mv-line')) {
+    for (const v of list) {
+      const walker = document.createTreeWalker(ln, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('mark, .mv-ko-sm') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+      let n, hit = null; while ((n = walker.nextNode())) { const mt = n.nodeValue.match(v.re); if (mt) { hit = [n, mt]; break; } }
+      if (!hit) continue;
+      const [tn, mt] = hit; const r = document.createRange(); r.setStart(tn, mt.index); r.setEnd(tn, mt.index + mt[0].length);
+      const mk = document.createElement('mark'); r.surroundContents(mk);
+      mk._card = v.card || (v.x ? exprCard(v.x) : findCard(mk.textContent, m)); if (!mk._card) { mk.replaceWith(...mk.childNodes); continue; }
+      ln._pop = ln._pop || { ko: '', cards: [] }; if (!ln._pop.cards.includes(mk._card)) ln._pop.cards.push(mk._card);
+    }
+  }
+}
 function mvPair(body, m) {
   const quote = body.querySelector('.mv-quote'); if (!quote) return false;
   const boxes = [...body.querySelectorAll('.mv-box')].filter(b => !b.contains(quote) && !b.parentElement.closest('.mv-box'));
@@ -1245,6 +1286,7 @@ function mvPair(body, m) {
   cards = cards.flatMap(b => { const out = []; for (const el of b.querySelectorAll('p, li')) { const mt = el.textContent.trim().match(/^[•·▪\-]\s*([^:：]{1,60}?)\s*[:：]\s*([\s\S]+)$/); if (mt && hangulShare(mt[1]) < .3 && hangulShare(mt[2]) > .3) { const d = document.createElement('div'); d.className = 'mv-box'; d.innerHTML = `<div class="mv-h">${esc(mt[1])}</div><p>${esc(mt[2].trim())}</p>`; out.push(d); } } if (out.length) { b.remove(); return out; } return [b]; });
   const paras = el => { const ps = [...el.querySelectorAll(':scope > p, :scope > div')].filter(x => x.textContent.trim()); return ps.length ? ps : [el]; };
   let en = paras(quote);
+  if (en.length && en.filter(e => /^\s*[•·▪]/.test(e.textContent) || /^\s*\d+\.\s/.test(e.textContent)).length * 2 >= en.length && hangulShare(quote.textContent) > .1) return false; // a list of rules or words, not a story
   if (en.length === 1 && en[0] === quote) { const p = document.createElement('p'); p.append(...quote.childNodes); quote.append(p); en = [p]; }
   // one long paragraph is cut into lines of a few sentences, so it can go over two pages instead of running off the screen
   en = en.flatMap(e => e.dataset.ko ? [e] : splitLong(e));
@@ -1360,6 +1402,8 @@ function mvCards(body, m) {
 }
 function mvBoxes(body, m) {
   const leaf = el => !el.querySelector('p, div, li');
+  // a slide of word cards ('1. make it (참석하다)' + examples) is not a story: leave it as cards (Ryan 2026-11-01)
+  if ([...body.querySelectorAll('.mv-box > .mv-h')].filter(h => /^\d+[.)]\s|\(.*[가-힣].*\)/.test(h.textContent.trim())).length >= 2 || /VOCAB|(?<!English )EXPRESSIONS?\b|어휘|단어|표현 정리/i.test([...body.querySelectorAll('.mv-chip, h3, .mv-h')].map(x => x.textContent).join(' '))) return false;
   // "• caught up with: 오랜만에 …" lines are the slide's own expression notes: they become the pop-up cards (Ryan 2026-11-01)
   const notes = [], noteEls = new Set();
   for (const el of body.querySelectorAll('p, li')) { const mt = el.textContent.trim().match(/^[•·▪\-]?\s*([^:：]{1,60}?)\s*[:：]\s*([\s\S]+)$/); if (!mt || hangulShare(mt[1]) > .3 || hangulShare(mt[2]) < .3) continue;
