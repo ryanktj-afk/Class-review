@@ -1056,6 +1056,7 @@ function memoView(m, box) {
       for (const h of [...body.querySelectorAll('h3, .mv-h')]) { const a = norm(h.textContent), t = norm(p.title); if (a && t && (a === t || (a.length > 4 && t.includes(a)) || (t.length > 4 && a.includes(t)))) h.remove(); }
     }
     cleanMarks(body, m);
+    mvPruneMarks(body);
     body.querySelectorAll('.mv-line mark').forEach(mk => mk.classList.toggle('tap', !!mk._card)); // only expressions with an explanation look tappable
     return { ...p, kind, pop, units: mvUnits(body) };
   });
@@ -1369,7 +1370,10 @@ function vocabPhrases(m) {
   const out = [], seen = new Set();
   const add = (raw, card, x) => { // every phrase keeps its own explanation (Ryan 2026-11-01: comply with opened 'trivial')
     for (let ph of raw.replace(/^\s*\d+[.)]\s*/, '').replace(/\(.*?\)|\[.*?\]|（.*?）/g, ' ').split(/\s*[\/·•,;]\s*|\s+vs\.?\s+/i)) {
-      ph = ph.replace(/[~…"“”]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      ph = ph.replace(/[~…"“”]/g, ' ').replace(/\s+/g, ' ').trim();
+      // Ryan 2026-11-01: never mark a lone name (Seolhee) or a lone helper word (couldn't) cut out of a longer card title.
+      if (!/\s/.test(ph) && (/^[A-Z]/.test(ph) || /'/.test(ph) || /^(can|could|would|should|will|shall|may|might|must|do|does|did|have|has|had|be|is|are|was|were|not|very|really|just|so|too|get|got|make|take)$/i.test(ph))) continue;
+      ph = ph.toLowerCase();
       if (!ph || /[가-힣]/.test(ph) || ph.length < 4 || seen.has(ph)) continue;
       const ws = ph.split(' '); if (ws.length > 6 || (ws.length === 1 && ph.length < 5)) continue;
       const parts = ws.map((w, i) => /^(someone|somebody|something|sb|sth|one's|someone's|a|the)$/.test(w) ? (/^(a|the)$/.test(w) ? '(?:a|an|the)' : "[\\w']+(?:\\s[\\w']+)?") : (i === 0 ? `(?:${wordForms(w)})` : w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -1380,6 +1384,30 @@ function vocabPhrases(m) {
   for (const x of m.expressions || []) if (x.meaning || x.situation) add(x.expr, null, x);
   out.sort((a, b) => b.len - a.len);
   return m._vocab = out;
+}
+// Ryan 2026-11-01: no blue on names, speaker labels (YJ:), question numbers, lone helper words, or a word joined to the wrong card.
+function mvPruneMarks(body) {
+  const FN = /^(i|a|an|the|they|he|she|we|it|you|this|that|still|however|so|but|and|or|then|also)$/i;
+  for (const mk of body.querySelectorAll('.mv-line mark')) {
+    const c = mk._card; if (!c) continue;
+    const t = mk.textContent.trim(), one = !/\s/.test(t);
+    const full = (c.textContent || [c.expr, c.meaning, c.situation].filter(Boolean).join(' ') || '').replace(/\s+/g, ' ').trim();
+    const head = full.replace(/^\d+[.)]\s*/, '').slice(0, 48).toLowerCase();
+    let bad = /:$/.test(t) || /^Q\d/i.test(t) || /^[A-Z]{4,}$/.test(t) || (one && (/'/.test(t) || (FN.test(t) && !head.startsWith(t.toLowerCase()))));
+    if (!bad && one && /^[A-Z][a-z]+$/.test(t)) {
+      const ln = mk.closest('.mv-line'), r = document.createRange(); r.setStart(ln, 0); r.setEndBefore(mk);
+      const before = r.toString().replace(/["“'‘(\s]+$/, '');
+      if (/[a-z,]$/.test(before) || /이름|영화|브랜드|지명|감독|게임기|회사명|작품/.test(full)) bad = true; // a capital word in mid-sentence is a name
+    }
+    if (!bad && one && /^[a-z]/i.test(t)) {
+      const w = t.toLowerCase().replace(/[^a-z-]/g, '');
+      const ok = w.length < 4 || head.includes(w.slice(0, 4)) || w.split('-').some(x => x.length >= 4 && head.includes(x.slice(0, 4))) || head.split(/[^a-z']+/).some(h => h.length > 1 && new RegExp(`^(?:${wordForms(h)})$`).test(w));
+      if (!ok) bad = true;
+    }
+    if (!bad) continue;
+    const ln = mk.closest('.mv-line'); mk.replaceWith(...mk.childNodes);
+    if (ln && ln._pop && ![...ln.querySelectorAll('mark')].some(x => x._card === c)) ln._pop.cards = ln._pop.cards.filter(x => x !== c);
+  }
 }
 function mvMarkVocab(body, m) {
   const list = vocabPhrases(m); if (!list.length) return;
