@@ -996,6 +996,7 @@ function memoView(m, box) {
     mvWrapInline(body);
     const kind = mvKind(p.label, p.title);
     const pop = (kind === 'nuance' && /^old-/.test(m.id) && mvPair(body, m)) || (kind === 'daily' || kind === 'work') && (mvArrow(body, m) || mvPair(body, m) || (!/[·•]/.test(p.title) && !/표현|어법|문법|vocab|word|expression|clinic|grammar/i.test(p.label + ' ' + p.title) && /^old-/.test(m.id) && mvBoxes(body, m)) || (/^old-/.test(m.id) && !/표현|어법|문법|vocab|word|expression|clinic|grammar|answer|정답|해설|연습|영작/i.test(p.label + ' ' + p.title) && mvCards(body, m))) // newer decks always use the quote box (mvPair);
+    if (pop) mvSplitLines(body, m);
     // Older decks repeat a label row ('EXPRESSIONS 1 · Events & Baseball') and the slide title under the title: drop them so every memo looks like 아람님 메모 (Ryan 2026-11-01)
     if (kind !== 'practice') {
       const norm = t => t.replace(/[\s()（）·•&,:\-]+/g, '').toLowerCase();
@@ -1025,6 +1026,10 @@ function memoView(m, box) {
     if (extra > 0) { hgt = Math.max(320, hgt - extra); stage.style.height = hgt + 'px'; }
     stage.innerHTML = '';
     pages = [cover()];
+    { const c = pages[0].el; stage.append(c); const tags = [...c.querySelectorAll('.mv-chip')]; // the cover fits one screen: fewer tags if needed
+      while (c.scrollHeight > hgt + 1 && tags.length) tags.pop().remove();
+      const h = c.querySelector('h2'); let f = 1.6; while (c.scrollHeight > hgt + 1 && f > 1) { f -= .1; h.style.fontSize = f + 'rem'; }
+      c.remove(); }
     slides.forEach((s, si) => {
       let page, bodyEl, n = 0, part = 0;
       const start = () => {
@@ -1041,21 +1046,38 @@ function memoView(m, box) {
       };
       const finish = () => { fit(); page.remove(); const b = page.querySelector('.mv-body'); if (part > 1 && b.textContent.trim().length < 60 && !b.querySelector('input, textarea, .mv-btn, .mv-line, img')) return; pages.push({ el: page, slide: si }); }; // a leftover label alone is not a page
       start();
-      for (const u of s.units) {
+      const queue = s.units.map(u => ({ ...u, node: u.node }));
+      for (let qi = 0; qi < queue.length; qi++) {
+        const u = queue[qi];
         if (u.ctrl) continue;
         const put = () => {
           let parent = bodyEl;
           if (u.wrap) {
             const last = bodyEl.lastElementChild;
             if (last && last.dataset.wrap === u.wrap.key) parent = last;
+            else if (u.wrap.table) { parent = u.wrap.table.cloneNode(false); parent.dataset.wrap = u.wrap.key; const th = u.wrap.table.querySelector(':scope > thead'); if (th) parent.append(th.cloneNode(true)); parent.append(document.createElement('tbody')); bodyEl.append(parent); }
             else { parent = document.createElement('div'); parent.className = u.wrap.cls; parent.dataset.wrap = u.wrap.key; if (u.wrap.cols) parent.dataset.cols = u.wrap.cols; bodyEl.append(parent); }
           }
-          parent.append(u.node); return parent;
+          (u.wrap?.table ? parent.querySelector(':scope > tbody') : parent).append(u.node); return parent;
         };
         const parent = put(); n++;
-        if (page.scrollHeight > hgt + 1 && n > 1) {
-          u.node.remove(); if (parent !== bodyEl && !parent.children.length) parent.remove();
+        // not too much on one page (Ryan 2026-11-01): a story page holds about three sentences, other pages a couple of cards
+        const wide = innerWidth >= 960;
+        const amount = s.pop ? [...bodyEl.querySelectorAll('.mv-line')].reduce((a, l) => a + (l.firstChild ? [...l.childNodes].filter(c => !c.classList?.contains('mv-ko-sm')).map(c => c.textContent).join('').trim().length : 0), 0) : bodyEl.textContent.replace(/\s+/g, ' ').trim().length;
+        const budget = s.pop ? (wide ? 520 : 260) : (wide ? 1100 : 480);
+        if ((page.scrollHeight > hgt + 1 || amount > budget) && n > 1) {
+          u.node.remove(); if (parent !== bodyEl && !(parent.matches('table') ? parent.querySelector('tbody').children.length : parent.children.length)) parent.remove();
           finish(); start(); put(); n = 1;
+        }
+        // one block taller than the screen (a long answer key, a big table): spread its parts over several pages
+        if ((page.scrollHeight > hgt + 1 || amount > budget) && n === 1) {
+          let nd = u.node; while (nd.children.length === 1 && !nd.matches('table, .mv-line')) nd = nd.children[0];
+          let kids = null;
+          if (nd.matches('table')) { const rows = [...nd.querySelectorAll(':scope > tbody > tr, :scope > tr')], th = nd.querySelector(':scope > thead');
+            if (rows.length > 1) { const key = 't' + si + '-' + qi; kids = rows.map(r => ({ node: r, wrap: { key, table: nd } })); } }
+          else if (nd.children.length > 1 && !nd.matches('.mv-line')) { const key = 's' + si + '-' + qi, cls = nd === u.node ? (nd.className || 'mv-flat') : (nd.className || u.node.className || 'mv-flat');
+            kids = [...nd.children].map(k => ({ node: k, wrap: { cls, key, cols: nd.dataset.cols || u.node.dataset.cols } })); }
+          if (kids) { u.node.remove(); if (parent !== bodyEl && !(parent.matches('table') ? parent.querySelector('tbody').children.length : parent.children.length)) parent.remove(); queue.splice(qi + 1, 0, ...kids); n = 0; continue; }
         }
       }
       finish();
@@ -1175,14 +1197,57 @@ function mvPool(parts) {
   }
   return out;
 }
+// A long English paragraph is cut into pieces of two or three sentences (Ryan 2026-11-01: not too much on one page).
+function splitLong(e, max = 200) {
+  if (e.textContent.trim().length <= max + 60) return [e];
+  const bits = e.innerHTML.trim().split(/(?<=[.!?]["”]?)\s+(?=["“]?[A-Z])(?![^<]*>)/);
+  if (bits.length < 2) return [e];
+  const groups = []; let cur = '';
+  for (const bt of bits) { if (cur && (cur + ' ' + bt).replace(/<[^>]+>/g, '').length > max) { groups.push(cur); cur = bt; } else cur = cur ? cur + ' ' + bt : bt; }
+  if (cur) groups.push(cur);
+  if (groups.length < 2) return [e];
+  const ps = groups.map(g => { const q = document.createElement(e.tagName === 'DIV' ? 'div' : 'p'); q.innerHTML = g; return q; });
+  e.replaceWith(...ps); return ps;
+}
+// A finished line that is still long (English + small Korean) is cut into lines of two or three sentences, Korean paired sentence by sentence.
+function mvSplitLines(body, m) {
+  for (const ln of [...body.querySelectorAll('.mv-line')]) {
+    const koEl = ln.querySelector(':scope > .mv-ko-sm');
+    const tmp = document.createElement('p'); for (const c of ln.childNodes) if (c !== koEl) tmp.append(c.cloneNode(true));
+    if (tmp.textContent.trim().length <= 260) continue;
+    const pieces = splitLong(tmp, 200); if (pieces.length < 2) continue;
+    const ko = ln._pop?.ko || koEl?.textContent || '';
+    let kos = pieces.map(() => '');
+    if (ko) {
+      const es = pieces.flatMap((e, j) => splitSent(e.textContent).map(t => ({ t, j })));
+      const al = alignKo(es.map(x => x.t), splitSent(ko.replace(/["“”]/g, ' '), true));
+      const got = pieces.map(() => []); let at = 0;
+      al.forEach(([e2, k2]) => { if (at >= es.length) return; got[es[at].j].push(k2); let a = 1; while (at + a < es.length && es.slice(at, at + a).map(x => x.t).join(' ') !== e2) a++; at += a; });
+      kos = got.map(g => g.join(' ').trim());
+    }
+    const out = pieces.map((pc, j) => {
+      const q = document.createElement('p'); q.className = 'mv-line'; q.append(...pc.childNodes);
+      const cards = []; for (const mk of q.querySelectorAll('mark')) { const c = findCard(mk.textContent, m, ln._pop?.cards || []); if (c) { mk._card = c; cards.push(c); } }
+      q._pop = { ko: kos[j], cards };
+      if (kos[j]) { const k = document.createElement('span'); k.className = 'mv-ko-sm'; k.textContent = kos[j]; q.append(k); }
+      return q;
+    });
+    ln.replaceWith(...out);
+  }
+}
 function mvPair(body, m) {
   const quote = body.querySelector('.mv-quote'); if (!quote) return false;
   const boxes = [...body.querySelectorAll('.mv-box')].filter(b => !b.contains(quote) && !b.parentElement.closest('.mv-box'));
-  const koBox = boxes.find(b => hangulShare(b.textContent) > .8);
-  const cards = boxes.filter(b => b !== koBox && hangulShare(b.textContent) <= .8);
+  // the Korean is either its own box or, in some older decks, a plain paragraph right after the quote
+  const koBox = boxes.find(b => hangulShare(b.textContent) > .8) || [...body.querySelectorAll('p, div')].find(el => !el.closest('.mv-box, .mv-quote') && !el.querySelector('p, div') && !el.contains(quote) && el.textContent.trim().length > 20 && hangulShare(el.textContent) > .8 && (quote.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING));
+  let cards = boxes.filter(b => b !== koBox && hangulShare(b.textContent) <= .8);
+  // a box of '• couldn't make it: 설명' lines is several cards, one per expression
+  cards = cards.flatMap(b => { const out = []; for (const el of b.querySelectorAll('p, li')) { const mt = el.textContent.trim().match(/^[•·▪\-]\s*([^:：]{1,60}?)\s*[:：]\s*([\s\S]+)$/); if (mt && hangulShare(mt[1]) < .3 && hangulShare(mt[2]) > .3) { const d = document.createElement('div'); d.className = 'mv-box'; d.innerHTML = `<div class="mv-h">${esc(mt[1])}</div><p>${esc(mt[2].trim())}</p>`; out.push(d); } } if (out.length) { b.remove(); return out; } return [b]; });
   const paras = el => { const ps = [...el.querySelectorAll(':scope > p, :scope > div')].filter(x => x.textContent.trim()); return ps.length ? ps : [el]; };
   let en = paras(quote);
   if (en.length === 1 && en[0] === quote) { const p = document.createElement('p'); p.append(...quote.childNodes); quote.append(p); en = [p]; }
+  // one long paragraph is cut into lines of a few sentences, so it can go over two pages instead of running off the screen
+  en = en.flatMap(e => e.dataset.ko ? [e] : splitLong(e));
   // Korean for each line: given on the line > the lesson's own sentence list > the slide's Korean box cut to fit
   let ko = en.map(e => e.dataset.ko || '');
   // sentence by sentence from the lesson's story (same pairs 반복 말하기 uses, hand-checked where needed)
@@ -1262,14 +1327,24 @@ function mvCards(body, m) {
     if (b.parentElement.closest('.mv-box') || b.querySelector('.mv-box, input, textarea, .mv-btn')) continue;
     const leafs = [...b.querySelectorAll('p, div, li')].filter(el => !el.querySelector('p, div, li') && el.textContent.trim());
     if (leafs.some(el => /^([•·▪\-]|\d+[.)])\s*/.test(el.textContent.trim()) || /^(예문|뜻|상황|포인트|뉘앙스|짝꿍)/.test(el.textContent.trim()))) continue; // a word card, not a story
-    const en = leafs.filter(el => { const t = el.textContent.trim(); return t.length >= 30 && t.split(/\s+/).length >= 6 && hangulShare(t) < .1; });
+    let en = leafs.filter(el => { const t = el.textContent.trim(); return t.length >= 30 && t.split(/\s+/).length >= 6 && hangulShare(t) < .1; });
     if (!en.length) continue;
     const ko = leafs.filter(el => !en.includes(el) && hangulShare(el.textContent) > .6 && el.textContent.trim().length > 10);
     if (ko.length > en.length) continue;
+    const en0 = en.length; const enS = en.flatMap(e => splitLong(e));
+    let kos = enS.map((e, j) => ko.length === en0 && en0 === enS.length ? ko[j].textContent.trim() : '');
+    if (ko.length && enS.length !== en0) { // pieces of one paragraph: pair the Korean sentence by sentence
+      const es = enS.flatMap((e, j) => splitSent(e.textContent).map(t => ({ t, j })));
+      const al = alignKo(es.map(x => x.t), splitSent(ko.map(k => k.textContent).join(' ').replace(/["“”]/g, ' '), true));
+      const got = enS.map(() => []); let at = 0;
+      al.forEach(([e2, k2]) => { if (at >= es.length) return; got[es[at].j].push(k2); let a = 1; while (at + a < es.length && es.slice(at, at + a).map(x => x.t).join(' ') !== e2) a++; at += a; });
+      kos = got.map(g => g.join(' ').trim());
+    }
+    en = enS;
     en.forEach((e, j) => {
-      let k = ko.length === en.length ? ko[j].textContent.trim() : '';
+      let k = kos[j];
       if (!k) { const ss = splitSent(e.textContent).map(normEn); if (ss.length && ss.every(x => map.has(x))) k = [...new Set(ss.map(x => map.get(x)))].join(' '); }
-      if (!k && ko.length === 1 && j === en.length - 1) k = ko[0].textContent.trim();
+      if (!k && ko.length === 1 && en.length === 1) k = ko[0].textContent.trim();
       const p = document.createElement('p'); p.className = 'mv-line'; p.append(...e.childNodes);
       for (const sp of [...p.querySelectorAll('span, b, strong, u')]) { const t = sp.textContent.trim(); if (t && t.split(/\s+/).length <= 8 && !sp.querySelector('mark')) { const mk = document.createElement('mark'); mk.append(...sp.childNodes); sp.replaceWith(mk); } }
       const cards = []; for (const mk of p.querySelectorAll('mark')) { const c = findCard(mk.textContent, m); if (c) { mk._card = c; cards.push(c); } }
@@ -1293,6 +1368,7 @@ function mvBoxes(body, m) {
     .map(el => { const t = el.textContent.trim(), h = hangulShare(t); return t.length > 40 && h < .15 && !el.closest('.mv-row') && (t.match(/\b[a-z][a-z']+\b/g) || []).length >= 3 ? { el, en: true } : t.length > 15 && h > .6 ? { el, en: false } : null; }).filter(Boolean);
   const storyHint = [...body.querySelectorAll('.mv-h, h3, h4')].some(h => /English Expression|Polished|Story$|Corrected/i.test(h.textContent.trim()));
   if (!items.some(x => x.en && x.el.textContent.trim().length >= (storyHint ? 30 : 100)) || items.filter(x => !x.en).length > items.filter(x => x.en).length + 1) return false; // a story, not a list of examples
+  for (let i = items.length - 1; i >= 0; i--) if (items[i].en) { const ps = splitLong(items[i].el); if (ps.length > 1) items.splice(i, 1, ...ps.map(el => ({ el, en: true }))); }
   const runs = []; for (const it of items) { const last = runs[runs.length - 1]; if (last && last.en === it.en) last.els.push(it.el); else runs.push({ en: it.en, els: [it.el] }); }
   const map = new Map(); if (m?.sentences?.length) storyParts(m).forEach(p => p.units.forEach(u => { if (u.ko) map.set(normEn(u.en), u.ko); }));
   runs.forEach((r, i) => {
