@@ -581,7 +581,7 @@ document.addEventListener('click', e => {
   const v = g.dataset.go; lastGo = v;
   if (v === 'cards' && g.closest('nav') && !dueCards().length) return toast('오늘 카드 복습은 끝났어요. 내일 다시 만나요');
   if (v === 'wrong' && g.closest('nav') && !quizOf(me).some(i => state[i.id]?.wrong)) return toast('아직 틀린 문제가 없어요');
-  if (v === 'logout') { me = null; store.set('nyft:token', null); if (location.hash) location.hash = ''; return login(); }
+  if (v === 'logout') { me = null; store.set('nyft:token', null); ss.set('nyft:nav', null); if (location.hash) location.hash = ''; return login(); }
   if (v === 'pin') return changePin();
   if (v === 'resume') return resume();
   if (v === 'speakpick') return speakPick();
@@ -733,7 +733,7 @@ async function enter(s) {
   try { await loadMemos(s.token); } catch { app.innerHTML = '<p class="err" style="padding:24px">수업 자료를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</p>'; return; }
   me = { ...s, memos: memosFor(s) };
   try { state = await api.getProgress(me.token) || {}; } catch { state = {}; }
-  me.must_change ? changePin(true) : home();
+  me.must_change ? changePin(true) : navRestore();
 }
 function changePin(first = false) {
   app.innerHTML = `${first ? '<div class="bar"><button class="ghost" data-go="logout">← 뒤로</button></div>' : bar('home')}
@@ -1084,6 +1084,7 @@ function memoView(m, box) {
       finish();
     });
     cur = Math.max(0, pages.findIndex(p => p.slide === keep));
+    if (RESTORE_PAGE && RESTORE_PAGE.id === m.id) { const rp = RESTORE_PAGE; RESTORE_PAGE = null; cur = pages[rp.i]?.slide === rp.slide ? rp.i : Math.max(0, pages.findIndex(p => p.slide === rp.slide)); }
     show(cur);
   }
   function show(i) {
@@ -1091,6 +1092,7 @@ function memoView(m, box) {
     stage.replaceChildren(pages[cur].el); stage.scrollTop = 0;
     box.querySelector('.mv-prev').disabled = cur === 0;
     const nx = box.querySelector('.mv-next'); nx.disabled = cur === pages.length - 1;
+    const nv = ss.get('nyft:nav'); if (nv && nv.name === 'lesson' && nv.args[0] === m.id) { nv.page = { i: cur, slide: pages[cur].slide }; ss.set('nyft:nav', nv); }
     box.querySelector('.mv-pos').innerHTML = `<b>${cur + 1}</b> / ${pages.length} <span>· 목차</span>`;
   }
   box.querySelector('.mv-prev').onclick = () => show(cur - 1);
@@ -2483,7 +2485,7 @@ async function admin(err = '') {
   q.oninput = filter; showout.onchange = filter; filter();
   const byId = Object.fromEntries(rows.map(r => [r.id, r]));
   // Teacher view: browse as a student (or all memos) without saving anything to their progress.
-  const viewAs = (who, memos, st, full = false) => { EXTRAS = full; me = { ...who, memos, viewOnly: true, token: null }; state = JSON.parse(JSON.stringify(st || {})); location.hash = 'view'; scrollTo(0, 0); home(); };
+  const viewAs = (who, memos, st, full = false) => { ss.set('nyft:viewas', { sid: who.id === 'teacher' ? null : who.id, name: who.name, full }); ss.set('nyft:nav', null); EXTRAS = full; me = { ...who, memos, viewOnly: true, token: null }; state = JSON.parse(JSON.stringify(st || {})); location.hash = 'view'; scrollTo(0, 0); home(); };
   document.getElementById('viewall').onclick = () => viewAs({ id: 'teacher', name: '전체 수업', group: '' }, Object.keys(DATA.memos), {});
   document.getElementById('viewfull').onclick = () => viewAs({ id: 'teacher', name: '전체 기능 체험', group: '' }, Object.keys(DATA.memos), {}, true);
   app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { const r = byId[b.dataset.view]; viewAs({ id: r.id, name: r.name, group: r.group }, memosFor(r), r.state); });
@@ -2550,7 +2552,7 @@ function demo(name) {
 
 // ---------- layout: PC sidebar / mobile tab bar (Ryan 2026-10-31) ----------
 // Every screen function is wrapped so the page knows which screen is showing and can draw the right menu.
-let lastGo = 'home', curLesson = null;
+let lastGo = 'home', curLesson = null, RESTORE_PAGE = null;
 const NAV = [['home', '🏠', '홈', '홈'], ['cards', '🃏', '카드 복습', '복습'], ['ten', '⏱️', '10분 연습', '10분'], ['grammar', '📐', '문법 연습', '문법'],
   ['speakpick', '🗣️', '반복 말하기'], ['quiz', '🎲', '랜덤 퀴즈'], ['wrong', '🎯', '틀린 문제'], ['words', '📒', '내 단어장', '단어장'], ['dict', '📖', '표현 사전']];
 const SCREEN_NAV = { home: 'home', lesson: 'home', dict: 'dict', speakPick: 'speakpick', speak: 'speakpick', wordbook: 'words', wordQuiz: 'words',
@@ -2583,14 +2585,43 @@ function layout(name) {
   tb.innerHTML = NAV.filter(n => n[3]).map(([k, ico, , short]) => `<button data-go="${k}" ${k === act ? 'aria-current="page"' : ''}><span class="i">${ico}</span>${short}${k === 'cards' && due ? `<span class="dot"></span>` : ''}</button>`).join('');
 }
 const lessonRaw = lesson;
-const screen = (name, f) => function (...a) { const r = f.apply(this, a); layout(name); return r; };
+const screen = (name, f) => function (...a) { const r = f.apply(this, a); layout(name); navSave(name, a); return r; };
+// Ryan 2026-11-01: a refresh brings back the same screen (and memo page) instead of the login screen.
+const NAV_OK = { home: 0, lesson: 2, dict: 0, speakPick: 0, speak: 1, wordbook: 0, grammarHub: 0, grammarUnit: 1, tensePage: 0, weakPage: 0 };
+const ss = { get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+function navSave(name, a) {
+  if (!me || !(name in NAV_OK)) return;
+  const args = a.slice(0, NAV_OK[name]).map(x => (typeof x === 'string' || typeof x === 'number') ? x : null);
+  const old = ss.get('nyft:nav');
+  const same = old && old.name === name && JSON.stringify(old.args) === JSON.stringify(args);
+  ss.set('nyft:nav', { name, args, page: same ? old.page : null });
+}
+function navRestore() {
+  const n = ss.get('nyft:nav'), fns = { home, lesson, dict, speakPick, speak, wordbook, grammarHub, grammarUnit, tensePage, weakPage };
+  if (!n || !fns[n.name] || (n.name === 'lesson' || n.name === 'speak') && !DATA.memos[n.args[0]]) return home();
+  if (n.name === 'lesson' && n.page) RESTORE_PAGE = { id: n.args[0], ...n.page };
+  try { fns[n.name](...n.args.filter(x => x != null)); } catch { home(); }
+}
+async function restoreView() {
+  const va = ss.get('nyft:viewas'); adminTok = adminTok || store.get('nyft:admin', null);
+  if (!va || !adminTok) return admin();
+  let rows = null; try { rows = await api.adminList(adminTok); } catch {}
+  if (!rows || !rows.length) return admin();
+  if (CFG.url && !Object.keys(DATA.memos).length) { try { await loadMemos(adminTok); } catch {} }
+  const r = va.sid ? rows.find(x => x.id === va.sid) : null;
+  if (va.sid && !r) return admin();
+  EXTRAS = !!va.full;
+  me = r ? { id: r.id, name: r.name, group: r.group, memos: memosFor(r), viewOnly: true, token: null } : { id: 'teacher', name: va.name, group: '', memos: Object.keys(DATA.memos), viewOnly: true, token: null };
+  state = JSON.parse(JSON.stringify((r && r.state) || {}));
+  navRestore();
+}
 home = screen('home', home); lesson = screen('lesson', (id, ...a) => (curLesson = id, lessonRaw(id, ...a))); dict = screen('dict', dict); speakPick = screen('speakPick', speakPick); speak = screen('speak', speak);
 wordbook = screen('wordbook', wordbook); wordQuiz = screen('wordQuiz', wordQuiz); grammarHub = screen('grammarHub', grammarHub); grammarUnit = screen('grammarUnit', grammarUnit);
 tensePage = screen('tensePage', tensePage); weakPage = screen('weakPage', weakPage); tenMinute = screen('tenMinute', tenMinute); cards = screen('cards', cards); quiz = screen('quiz', quiz);
 finish = screen('finish', finish); changePin = screen('changePin', changePin); login = screen('login', login); admin = screen('admin', admin); demo = screen('demo', demo);
 document.addEventListener('focusin', e => { if (e.target.matches('input, textarea')) document.body.classList.add('typing'); });
 document.addEventListener('focusout', () => document.body.classList.remove('typing'));
-function route() { if (window.DEMO && !me) return demo(window.DEMO); if (location.hash === '#view' && me?.viewOnly) return; if (location.hash === '#admin') admin(); else login(); }
+function route() { if (window.DEMO && !me) return demo(window.DEMO); if (location.hash === '#view' && me?.viewOnly) return; if (location.hash === '#view') return restoreView(); if (location.hash === '#admin') admin(); else login(); }
 window.addEventListener('hashchange', route);
 route();
 </script>
