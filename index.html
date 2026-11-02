@@ -2541,6 +2541,14 @@ function finish(title, line, back) {
 
 // ---------- teacher admin (#admin) ----------
 let adminTok = null;
+// Ryan 2026-11-02 '반 추가가 안돼': after saving, the screen redraws, so keep the open panels open and say what happened.
+const admOpen = k => { try { const v = sessionStorage.getItem('adm-open:' + k); if (v !== null) return v === '1'; } catch {} return matchMedia('(min-width: 960px)').matches; };
+async function admSave(btn, job, done) {
+  if (btn) btn.disabled = true;
+  let ok = false; try { ok = await job(); } catch {}
+  if (ok === false) { if (btn) btn.disabled = false; return toast('저장하지 못했어요. 나가기 후 다시 들어와 주세요.'); }
+  if (done) toast(done); admin();
+}
 async function admin(err = '') {
   EXTRAS = false; me = null;
   document.body.classList.remove('authed', 'focus', 'lite');
@@ -2613,13 +2621,13 @@ async function admin(err = '') {
   <aside class="adm-side stack" style="gap:14px">
     <button class="cta" id="viewall"><span><b>모든 수업 보기</b><small>메모 ${Object.keys(DATA.memos).length}개를 학생 화면 그대로 둘러봐요</small></span><span class="arrow">→</span></button>
     <button class="cta adm-extra" id="viewfull"><span><b>숨긴 기능까지 써 보기</b><small>랜덤 퀴즈, 10분 복습, 문법 문제, 카드 등 학생에게 가려 둔 기능 전부</small></span><span class="arrow">→</span></button>
-    <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>반 관리 (${groups.length})</summary>
+    <details class="expr adm-add" data-keep="grp" ${admOpen('grp') ? 'open' : ''}><summary>반 관리 (${groups.length})</summary>
       <div class="stack" style="gap:8px;margin-top:10px">
         ${groups.map(g => `<div class="adm-grow"><span>${esc(g)} <span class="muted">${rows.filter(r => r.group === g && r.active).length}명</span></span><span class="row" style="gap:4px;flex:none"><button class="ghost" data-rengrp="${esc(g)}">이름 수정</button><button class="ghost" data-delgrp="${esc(g)}">삭제</button></span></div>`).join('') || '<p class="muted" style="font-size:.85rem">아직 반이 없어요.</p>'}
         <form id="addgrp" class="adm-grow"><input class="answer-in" id="gname" placeholder="새 반 이름 (예: 화목 7pm)" style="min-width:0"><button class="btn" style="width:auto;flex:none;white-space:nowrap;padding:0 18px">추가</button></form>
       </div>
     </details>
-    <details class="expr adm-add" ${matchMedia('(min-width: 960px)').matches ? 'open' : ''}><summary>학생 추가</summary>
+    <details class="expr adm-add" data-keep="add" ${admOpen('add') ? 'open' : ''}><summary>학생 추가</summary>
     <form id="add" class="stack" style="gap:10px;margin-top:10px">
       <input class="answer-in" id="nn" placeholder="이름 (예: 민지님)">
       <select class="answer-in" id="ng" aria-label="반">${grpOpts('')}</select>
@@ -2676,19 +2684,23 @@ async function admin(err = '') {
   document.getElementById('aout').onclick = () => { adminTok = null; store.set('nyft:admin', null); location.hash = ''; };
   document.getElementById('add').onsubmit = async e => {
     e.preventDefault();
-    const name = document.getElementById('nn').value.trim(); if (!name) return;
+    const name = document.getElementById('nn').value.trim(); if (!name) return toast('이름을 적어 주세요.');
     const id = 's-' + Math.random().toString(36).slice(2, 8);
-    await api.adminSave(adminTok, id, name, document.getElementById('ng').value, []); admin();
+    admSave(e.submitter, async () => !!(await api.adminSave(adminTok, id, name, document.getElementById('ng').value, [])), `${name}을 추가했어요.`);
   };
   app.querySelectorAll('[data-grp]').forEach(sel => sel.onchange = async () => {
     const r = byId[sel.dataset.grp];
     await api.adminSave(adminTok, r.id, r.name, sel.value, r.memos || []); admin();
   });
+  app.querySelectorAll('details[data-keep]').forEach(d => d.ontoggle = () => { try { sessionStorage.setItem('adm-open:' + d.dataset.keep, d.open ? '1' : '0'); } catch {} });
+  document.getElementById('gname').onkeydown = e => { if (e.key === 'Enter' && e.isComposing) e.preventDefault(); };
   document.getElementById('addgrp').onsubmit = async e => {
     e.preventDefault();
-    const g = document.getElementById('gname').value.trim(); if (!g) return;
+    const g = document.getElementById('gname').value.trim(); if (!g) return toast('반 이름을 적어 주세요.');
     if (groups.includes(g)) return toast('이미 있는 반이에요.');
-    await api.saveGroups(adminTok, [...groups, g]); GROUPS = [...groups, g]; admin();
+    const list = [...groups, g];
+    try { sessionStorage.setItem('adm-open:grp', '1'); } catch {}
+    admSave(e.submitter, async () => { const ok = await api.saveGroups(adminTok, list); if (ok) GROUPS = list; return !!ok; }, `'${g}' 반을 추가했어요.`);
   };
   app.querySelectorAll('[data-rengrp]').forEach(b => b.onclick = () => {
     const g = b.dataset.rengrp, row = b.closest('.adm-grow');
@@ -2709,9 +2721,11 @@ async function admin(err = '') {
   app.querySelectorAll('[data-delgrp]').forEach(b => b.onclick = async () => {
     const g = b.dataset.delgrp, inG = rows.filter(r => r.group === g);
     if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = inG.length ? `삭제 (${inG.length}명은 개인으로)` : '정말 삭제'; return; }
-    for (const r of inG) await api.adminSave(adminTok, r.id, r.name, '', r.memos || []);
     const left = groups.filter(x => x !== g);
-    await api.saveGroups(adminTok, left); GROUPS = left; admin();
+    admSave(b, async () => {
+      for (const r of inG) await api.adminSave(adminTok, r.id, r.name, '', r.memos || []);
+      const ok = await api.saveGroups(adminTok, left); if (ok) GROUPS = left; return !!ok;
+    }, `'${g}' 반을 삭제했어요.${inG.length ? ` ${inG.length}명은 개인으로 옮겼어요.` : ''}`);
   });
   app.querySelectorAll('[data-memo]').forEach(c => c.onchange = async () => {
     const r = byId[c.dataset.memo];
