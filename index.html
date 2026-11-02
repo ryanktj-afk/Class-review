@@ -475,7 +475,11 @@ body.lite .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)) }
 .adm-grow .ghost { font-size: .85rem }
 select.answer-in { appearance: auto }
 /* admin: one column on phones, side panel + card grid on PC */
-.adm-cols { display: grid; gap: 18px }
+.adm-cols { display: grid; gap: 18px } .adm-cols[hidden], .adm-gu[hidden], .adm-gch[hidden] { display: none }
+.adm-tabs { display: flex; gap: 6px; margin: 4px 0 18px; border-bottom: 1px solid var(--line) }
+.adm-tabs button { flex: 1; max-width: 200px; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 8px; font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; margin-bottom: -1px }
+.adm-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent, #3182f6) }
+.adm-glist { display: grid; gap: 8px }
 .adm-search { display: grid; gap: 8px }
 .adm-toggle { font-size: .85rem; display: flex; gap: 6px; align-items: center }
 .adm-list { display: grid; gap: 12px }
@@ -492,6 +496,7 @@ select.answer-in { appearance: auto }
   .adm-side { position: sticky; top: 24px }
   .adm-search { grid-template-columns: 1fr auto; align-items: center }
   .adm-list { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start }
+  .adm-glist { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) }
 }
 </style>
 
@@ -2585,10 +2590,26 @@ async function admin(err = '') {
       </div></div>`;
   const section = (title, list, kind) => `<div class="adm-sec" data-kind="${kind}"><div class="adm-sec-h"><span class="label">${esc(title)}</span><span class="muted adm-n"></span></div>
     <div class="adm-list">${list.map(card).join('') || '<p class="muted adm-empty">아직 학생이 없어요.</p>'}</div></div>`;
+  // Ryan 2026-11-02: two tabs. Grammar first; the student list shows only after tapping 학생 관리.
+  let tab = 'grammar'; try { tab = sessionStorage.getItem('adm-tab') || 'grammar'; } catch {}
+  const gChapters = []; for (const u of G.units) { let c = gChapters.find(x => x.name === u.chapter); if (!c) gChapters.push(c = { name: u.chapter, units: [] }); c.units.push(u); }
+  const gTotal = G.units.reduce((a, u) => a + u.fill.length + u.production.length, 0);
   app.innerHTML = `<div class="adm">
   <div class="bar adm-bar"><span class="who">선생님 관리 화면</span><a class="ghost" href="#" style="text-decoration:none">학생 화면</a><button class="ghost" id="aout">나가기</button></div>
   ${CFG.url ? '' : '<p class="feedback no">미리보기 모드예요. 여기서 바꾼 내용은 이 브라우저에만 저장돼요. (관리자 비밀번호: 5813)</p>'}
-  <div class="adm-cols">
+  <div class="adm-tabs" role="tablist"><button role="tab" data-tab="grammar" aria-selected="${tab === 'grammar'}">문법 문제</button><button role="tab" data-tab="students" aria-selected="${tab === 'students'}">학생 관리</button></div>
+  <div class="adm-cols" data-pane="grammar" ${tab === 'grammar' ? '' : 'hidden'}>
+  <aside class="adm-side stack" style="gap:14px">
+    <button class="cta" id="gview"><span><b>학생 화면으로 문법 보기</b><small>학생이 보는 문법 연습 화면 그대로 · 유닛 ${G.units.length}개</small></span><span class="arrow">→</span></button>
+    <button class="cta adm-extra" id="gfull"><span><b>숨긴 문법 기능까지</b><small>맞춤 퀴즈, 10분 연습, 시제 연습, 약한 어법</small></span><span class="arrow">→</span></button>
+  </aside>
+  <section class="adm-main stack" style="gap:12px">
+    <input class="answer-in" id="gq" type="search" placeholder="유닛 번호·제목 검색 (예: 102)" autocomplete="off">
+    <span class="label" id="gcnt">유닛 ${G.units.length}개 · 문제 ${gTotal.toLocaleString()}개</span>
+    ${gChapters.map(c => `<div class="adm-gch stack" style="gap:8px"><h2 class="adm-cat">${esc(c.name)}</h2><div class="adm-glist">${c.units.map(u => `<button class="lesson adm-gu" data-gunit="${u.n}" data-q="${esc((u.n + ' unit ' + u.n + ' ' + u.title).toLowerCase())}"><span class="date">${u.n}<small>Unit</small></span><span class="t"><h3>${esc(u.title)}</h3><p>빈칸 ${u.fill.length} · 영작 ${u.production.length} · ${unitSets(u).length}세트</p></span></button>`).join('')}</div></div>`).join('')}
+    <p class="muted" id="gnone" hidden>찾는 유닛이 없어요.</p>
+  </section></div>
+  <div class="adm-cols" data-pane="students" ${tab === 'students' ? '' : 'hidden'}>
   <aside class="adm-side stack" style="gap:14px">
     <button class="cta" id="viewall"><span><b>모든 수업 보기</b><small>메모 ${Object.keys(DATA.memos).length}개를 학생 화면 그대로 둘러봐요</small></span><span class="arrow">→</span></button>
     <button class="cta adm-extra" id="viewfull"><span><b>숨긴 기능까지 써 보기</b><small>랜덤 퀴즈, 10분 복습, 문법 문제, 카드 등 학생에게 가려 둔 기능 전부</small></span><span class="arrow">→</span></button>
@@ -2628,10 +2649,28 @@ async function admin(err = '') {
   };
   try { q.value = sessionStorage.getItem('adm-q') || ''; } catch {}
   q.oninput = filter; showout.onchange = filter; filter();
+  app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+    const t = b.dataset.tab; try { sessionStorage.setItem('adm-tab', t); } catch {}
+    app.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+    app.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== t);
+    scrollTo(0, 0);
+  });
+  const gq = document.getElementById('gq');
+  gq.oninput = () => {
+    const t = gq.value.trim().toLowerCase(); let n = 0;
+    app.querySelectorAll('.adm-gu').forEach(b => { const ok = !t || b.dataset.q.includes(t); b.hidden = !ok; n += ok; });
+    app.querySelectorAll('.adm-gch').forEach(c => c.hidden = !c.querySelector('.adm-gu:not([hidden])'));
+    document.getElementById('gcnt').textContent = t ? `검색 결과 ${n}개` : `유닛 ${G.units.length}개 · 문제 ${gTotal.toLocaleString()}개`;
+    document.getElementById('gnone').hidden = n > 0;
+  };
   const byId = Object.fromEntries(rows.map(r => [r.id, r]));
   // Teacher view: browse as a student (or all memos) without saving anything to their progress.
   const viewAs = (who, memos, st, full = false) => { ss.set('nyft:viewas', { sid: who.id === 'teacher' ? null : who.id, name: who.name, full }); ss.set('nyft:nav', null); EXTRAS = full; me = { ...who, memos, viewOnly: true, token: null }; state = JSON.parse(JSON.stringify(st || {})); location.hash = 'view'; scrollTo(0, 0); home(); };
   document.getElementById('viewall').onclick = () => viewAs({ id: 'teacher', name: '전체 수업', group: '' }, Object.keys(DATA.memos), {});
+  const gTeacher = full => viewAs({ id: 'teacher', name: full ? '전체 기능 체험' : '문법 문제', group: '' }, Object.keys(DATA.memos), {}, full);
+  document.getElementById('gview').onclick = () => { gTeacher(false); lastGo = 'grammar'; grammarHub(); };
+  document.getElementById('gfull').onclick = () => { gTeacher(true); lastGo = 'grammar'; grammarHub(); };
+  app.querySelectorAll('[data-gunit]').forEach(b => b.onclick = () => { const n = +b.dataset.gunit; gTeacher(false); lastGo = 'gunit:' + n; grammarUnit(n); });
   document.getElementById('viewfull').onclick = () => viewAs({ id: 'teacher', name: '전체 기능 체험', group: '' }, Object.keys(DATA.memos), {}, true);
   app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { const r = byId[b.dataset.view]; viewAs({ id: r.id, name: r.name, group: r.group }, memosFor(r), r.state); });
   document.getElementById('aout').onclick = () => { adminTok = null; store.set('nyft:admin', null); location.hash = ''; };
