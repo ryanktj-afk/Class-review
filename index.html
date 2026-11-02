@@ -498,6 +498,24 @@ select.answer-in { appearance: auto }
   .adm-list { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start }
   .adm-glist { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) }
 }
+/* grammar stage (Ryan 2026-11-02): whole screen, big type, for showing in class */
+body.gstage #side, body.gstage #tabbar { display: none !important }
+body.authed.gstage .wrap { max-width: min(1500px, 100%) !important; width: 100%; margin: 0 auto !important; padding: clamp(14px, 2.4vh, 36px) clamp(16px, 4vw, 72px) clamp(18px, 3vh, 40px) !important; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column }
+body.gstage .bar.top { display: flex !important }
+body.gstage .wrap > .stack { flex: 1; display: flex; flex-direction: column; gap: clamp(12px, 2vh, 24px) !important }
+body.gstage .card { flex: 1; align-content: center; gap: clamp(14px, 2.6vh, 34px); padding: clamp(22px, 4vw, 72px) clamp(18px, 4vw, 80px); min-height: 0 }
+body.gstage .sentence { font-size: clamp(1.45rem, min(3vw, 5.6vh), 3.6rem); line-height: 1.75 }
+body.gstage .gin { font-size: inherit; padding: 0 .3em; margin: 0 .15em }
+body.gstage .ko-src { font-size: clamp(1.1rem, min(2vw, 3.6vh), 2.2rem) }
+body.gstage .card .prompt { font-size: clamp(1.5rem, min(3vw, 5.6vh), 3.4rem) }
+body.gstage .card .answer .en, body.gstage #model .en { font-size: clamp(1.4rem, 3vw, 3.2rem) }
+body.gstage .hint, body.gstage .feedback, body.gstage .hintbtn, body.gstage #model { font-size: clamp(1rem, min(1.6vw, 3vh), 1.8rem) }
+body.gstage .card .answer-in { font-size: clamp(1.05rem, 2vw, 2rem) }
+body.gstage .btn { font-size: clamp(1rem, 1.6vw, 1.6rem); min-height: clamp(52px, 7vh, 84px) }
+body.gstage .label, body.gstage .pill { font-size: clamp(.85rem, 1.2vw, 1.25rem) }
+body.gstage #model b, body.gstage .feedback .ex span { font-size: clamp(1.2rem, min(2.4vw, 4.4vh), 2.8rem); line-height: 1.5 }
+body.gstage .bar .ghost, body.gstage .bar .who, body.gstage .stepnav button { font-size: clamp(.95rem, min(1.3vw, 2.4vh), 1.4rem) }
+body.gstage .progress { height: clamp(6px, .8vh, 12px) }
 </style>
 
 <nav id="side" aria-label="메뉴"></nav>
@@ -2143,8 +2161,11 @@ function compareAns(mine, model) {
   const miss = b.filter((_, j) => !okB.has(j));
   return `<div class="feedback no"><span class="label">내 답</span><div style="margin-top:4px;color:var(--ink)">${mineH}</div>${miss.length ? `<div style="margin-top:6px">빠진 말: <b>${esc(miss.join(' · '))}</b></div>` : ''}<div class="muted" style="margin-top:4px;font-size:.85rem">줄 그은 말은 모범 답안에 없는 말이에요. 뜻이 같으면 맞은 거예요.</div></div>`;
 }
+// Ryan 2026-11-02: grammar questions fill the whole screen with big text (shown on a classroom screen), PC and phone.
+let QUIZ_STAGE = false;
 function quiz(list, back, start = 0, right0 = 0) {
   let i = start, right = right0;
+  QUIZ_STAGE = list.filter(x => x.unit).length * 2 >= list.length;
   const deadline = QUIZ_DEADLINE; QUIZ_DEADLINE = 0; // set only by 10분 연습
   if (!list.length) return home();
   const show = () => {
@@ -2762,6 +2783,7 @@ function layout(name) {
   const b = document.body, side = document.getElementById('side'), tb = document.getElementById('tabbar');
   const on = !!me && !NO_NAV.has(name);
   b.dataset.screen = name; b.classList.toggle('authed', on); b.classList.toggle('focus', on && FOCUS.has(name));
+  b.classList.toggle('gstage', on && QUIZ_STAGE && (name === 'quiz' || name === 'finish'));
   if (!on) { side.innerHTML = tb.innerHTML = ''; return; }
   b.classList.toggle('lite', !EXTRAS);
   if (!EXTRAS) {
